@@ -1,250 +1,395 @@
-#include "bzfsAPI.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/*
+UselessMine
+    Copyright (C) 2014 Vladimir "allejo" Jimenez
 
-class uselessmine : public bz_Plugin, bz_CustomSlashCommandHandler
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include <memory>
+#include <stdlib.h>
+
+#include "bzfsAPI.h"
+#include "bztoolkit/bzToolkitAPI.h"
+
+// Define plugin name
+const std::string PLUGIN_NAME = "Useless Mine";
+
+// Define plugin version numbering
+const int MAJOR = 1;
+const int MINOR = 0;
+const int REV = 0;
+const int BUILD = 8;
+
+class UselessMine : public bz_Plugin, public bz_CustomSlashCommandHandler
 {
-	virtual const char* Name (){return "Useless Mine";}
-	virtual void Init (const char* /*config*/);
-	virtual void Event(bz_EventData *eventData);
-	virtual bool SlashCommand (int playerID,bz_ApiString command,bz_ApiString message,bz_APIStringList* params);
-	virtual void Cleanup ();
-	virtual int CountMines();
-	virtual void SetMine(int playerID,float pos1,float pos2,float pos3);
-	virtual void RemoveMine(int id);
-	virtual void RemoveAllMines(int playerID);
-	public:
-		double spawnsafetime; //This variable can be modified to reflect how much time players have before being hit by mines after spawning
-		bool mine[255]; //Whether or not the mine has been set.
-		signed int mineplayer[255]; //Which player set up the mine.
-		float minepos[255][3]; //The position of a mine.
-		signed int mineteam[255]; //The team the mine was set on.
-		double safetytime[255]; //The safe time limit that players have when they spawn. To prevent instant deaths.
-		bool minenotify[255]; //Tells the player they have useless.
+public:
+    virtual const char* Name ();
+    virtual void Init (const char* config);
+    virtual void Event (bz_EventData *eventData);
+    virtual void Cleanup (void);
+
+    virtual bool SlashCommand (int playerID, bz_ApiString, bz_ApiString, bz_APIStringList*);
+
+    virtual int  getMineCount ();
+    virtual void initializeMessages (void),
+                 removeAllMines(int playerID),
+                 removeMine (int mineIndex),
+                 setMine (int owner, float pos[3], bz_eTeamType team);
+
+    // The information each mine will contain
+    struct Mine
+    {
+        int owner, victim; // The owner of the mine and the victim, respectively
+
+        float x, y, z;     // The coordinates of where the mine was placed
+
+        bz_eTeamType team; // The team of the owner
+
+        bool detonated;    // Whether or not the mine has been detonated; to prepare it for removal from play
+
+        Mine (int _owner, float _pos[3], bz_eTeamType _team) :
+            owner(_owner),
+            victim(-1),
+            x(_pos[0]),
+            y(_pos[1]),
+            z(_pos[2]),
+            team(_team),
+            detonated(false)
+        {}
+    };
+
+    std::vector<Mine>        activeMines;   // A vector that will store all of the mines that are in play
+    std::vector<std::string> deathMessages; // A vector that will store all of the witty death messages
+
+    double bzdb_SpawnSafetyTime, // The BZDB variable that will store the amount of seconds a player has before a mine is detonated
+           playerSpawnTime[256]; // The time of a player's last spawn time used to calculate their safety from detonation
 };
 
-BZ_PLUGIN(uselessmine);
+BZ_PLUGIN(UselessMine)
 
-void uselessmine::Init(const char* /*commandline*/)
+const char* UselessMine::Name (void)
 {
-	spawnsafetime=5.0; //Tells the plugin to allow 5 seconds of grace time before activating mines on a player.
-	
-	bz_debugMessage(1,"Useless Mine plugin loaded");
-	bz_registerCustomSlashCommand("mine",this);
-	Register(bz_eFlagGrabbedEvent);
-	Register(bz_ePlayerPartEvent);
-	Register(bz_ePlayerUpdateEvent);
-	Register(bz_ePlayerDieEvent);
-	Register(bz_ePlayerSpawnEvent);
-	int i;
-	for (i=0;i<255;i++) {
-		mine[i]=0;
-		mineplayer[i]=-1;
-		minepos[i][0]=0;
-		minepos[i][1]=0;
-		minepos[i][2]=0;
-		mineteam[i]=-1;
-		minenotify[i]=0;
-	}
+    static std::string pluginBuild = "";
+
+    if (!pluginBuild.size())
+    {
+        std::ostringstream pluginBuildStream;
+
+        pluginBuildStream << PLUGIN_NAME << " " << MAJOR << "." << MINOR << "." << REV << " (" << BUILD << ")";
+        pluginBuild = pluginBuildStream.str();
+    }
+
+    return pluginBuild.c_str();
 }
 
-int uselessmine::CountMines()
+void UselessMine::Init (const char* commandLine)
 {
-	int i,mines;
-	mines=0;
-	for (i=0;i<255;i++) {
-		if (mine[i]) {mines++;}
-	}
-	return mines;
+    // Register our events with Register()
+    Register(bz_eFlagGrabbedEvent);
+    Register(bz_ePlayerDieEvent);
+    Register(bz_ePlayerPartEvent);
+    Register(bz_ePlayerSpawnEvent);
+    Register(bz_ePlayerUpdateEvent);
+
+    // Register our custom slash commands
+    bz_registerCustomSlashCommand("mine", this);
+
+    // Initialize all of the witty death messages
+    initializeMessages();
+
+    // Set some custom BZDB variables
+    bzdb_SpawnSafetyTime = bztk_registerCustomDoubleBZDB("_mineSafetyTime", 5.0);
 }
 
-void uselessmine::Cleanup(void)
+void UselessMine::Cleanup (void)
 {
-	Flush();
-	bz_removeCustomSlashCommand("mine");
-	bz_debugMessage(1,"Useless Mine plugin unloaded");
+    Flush(); // Clean up all the events
+
+    // Clean up our custom slash commands
+    bz_removeCustomSlashCommand("mine");
 }
 
-void uselessmine::SetMine(int playerID,float pos1,float pos2,float pos3)
+void UselessMine::Event (bz_EventData *eventData)
 {
-	int i;
-	for (i=0;i<255;i++) {
-		if (!mine[i]) {break;}
-	}
-	mine[i]=1;
-	mineplayer[i]=playerID;
-	minepos[i][0]=pos1;
-	minepos[i][1]=pos2;
-	minepos[i][2]=pos3;
-	bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
-	if (pr) {
-		mineteam[i]=pr->team;
-		bz_freePlayerRecord(pr);
-	}
+    switch (eventData->eventType)
+    {
+        case bz_eFlagGrabbedEvent: // This event is called each time a flag is grabbed by a player
+        {
+            bz_FlagGrabbedEventData_V1* flagGrabData = (bz_FlagGrabbedEventData_V1*)eventData;
+
+            // Data
+            // ---
+            //    (int)           playerID  - The player that grabbed the flag
+            //    (int)           flagID    - The flag ID that was grabbed
+            //    (bz_ApiString)  flagType  - The flag abbreviation of the flag that was grabbed
+            //    (float[3])      pos       - The position at which the flag was grabbed
+            //    (double)        eventTime - This value is the local server time of the event.
+
+            // If the user grabbed the Useless flag, let them know they can place a mine
+            if (strcmp(flagGrabData->flagType, "US") == 0)
+            {
+                bz_sendTextMessage(BZ_SERVER, flagGrabData->playerID, "You grabbed a Useless flag! Type /mine at any time to set a useless mine!");
+            }
+        }
+        break;
+
+
+        case bz_ePlayerDieEvent: // This event is called each time a tank is killed.
+        {
+            bz_PlayerDieEventData_V1* dieData = (bz_PlayerDieEventData_V1*)eventData;
+
+            // Data
+            // ---
+            //   (int)                   playerID       - ID of the player who was killed.
+            //   (bz_eTeamType)          team           - The team the killed player was on.
+            //   (int)                   killerID       - The owner of the shot that killed the player, or BZ_SERVER for server side kills
+            //   (bz_eTeamType)          killerTeam     - The team the owner of the shot was on.
+            //   (bz_ApiString)          flagKilledWith - The flag name the owner of the shot had when the shot was fired.
+            //   (int)                   shotID         - The shot ID that killed the player, if the player was not killed by a shot, the id will be -1.
+            //   (bz_PlayerUpdateState)  state          - The state record for the killed player at the time of the event
+            //   (double)                eventTime      - Time of the event on the server.
+
+            int playerID = dieData->playerID;
+
+            // Loop through all the mines in play
+            for (int i = 0; i < getMineCount(); i++)
+            {
+                // Create a local variable for easy access
+                Mine &detonatedMine = activeMines.at(i);
+
+                // Check if the mine has already been detonated
+                if (detonatedMine.detonated)
+                {
+                    // Check if the victim killed is the player who just died
+                    if (detonatedMine.victim == playerID)
+                    {
+                        // Check if the player who just died was killed by the server
+                        if (dieData->killerID == 253)
+                        {
+                            // The random number used to fetch a random taunting death message
+                            int randomNumber = rand() % deathMessages.size();
+
+                            // Get the callsigns of the players
+                            const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
+                            const char* victim = bz_getPlayerCallsign(detonatedMine.victim);
+
+                            // Attribute the kill to the mine owner
+                            dieData->killerID = detonatedMine.owner;
+
+                            // This mine has been detonated and we're done with the information that we need
+                            removeMine(i);
+
+                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, deathMessages.at(randomNumber).c_str(), owner, victim);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        break;
+
+        case bz_ePlayerPartEvent: // This event is called each time a player leaves a game
+        {
+            bz_PlayerJoinPartEventData_V1* partData = (bz_PlayerJoinPartEventData_V1*)eventData;
+
+            // Data
+            // ---
+            //    (int)                   playerID  - The player ID that is leaving
+            //    (bz_BasePlayerRecord*)  record    - The player record for the leaving player
+            //    (bz_ApiString)          reason    - The reason for leaving, such as a kick or a ban
+            //    (double)                eventTime - Time of event.
+
+            int playerID = partData->playerID;
+
+            removeAllMines(playerID);
+        }
+        break;
+
+        case bz_ePlayerSpawnEvent: // This event is called each time a playing tank is being spawned into the world
+        {
+            bz_PlayerSpawnEventData_V1* spawnData = (bz_PlayerSpawnEventData_V1*)eventData;
+
+            // Data
+            // ---
+            //    (int)                   playerID  - ID of the player who was added to the world.
+            //    (bz_eTeamType)          team      - The team the player is a member of.
+            //    (bz_PlayerUpdateState)  state     - The state record for the spawning player
+            //    (double)                eventTime - Time local server time for the event.
+
+            int playerID = spawnData->playerID;
+
+            // Save the time the player spawned last
+            playerSpawnTime[playerID] = bz_getCurrentTime();
+        }
+        break;
+
+        case bz_ePlayerUpdateEvent: // This event is called each time a player sends an update to the server
+        {
+            bz_PlayerUpdateEventData_V1* updateData = (bz_PlayerUpdateEventData_V1*)eventData;
+
+            // Data
+            // ---
+            //   (int)       playerID  - ID of the player that sent the update
+            //   (float[3])  pos       - The player's current position
+            //   (float[3])  velocity  - The player's current velocity
+            //   (float)     azimuth   - The direction the player is facing
+            //   (float)     angvel    - The player's angular velocity
+            //   (int)       phydrv    - The physics driver the player is on
+            //   (double)    eventTime - The current server time
+
+            int playerID = updateData->playerID;
+
+            // Loop through all of the players
+            for (int i = 0; i < getMineCount(); i++)
+            {
+                // Make an easy access mine
+                Mine &currentMine = activeMines.at(i);
+
+                // If the mine owner is not the player triggering the mine (so no self kills) and the player is a rogue or does is an enemy team relative to the mine owner
+                if (currentMine.owner != playerID && (bz_getPlayerTeam(playerID) == eRogueTeam || bz_getPlayerTeam(playerID) != currentMine.team))
+                {
+                    // Make easy to access variables
+                    float  playerPos[3] = {updateData->state.pos[0], updateData->state.pos[1], updateData->state.pos[2]};
+                    double shockRange   = bz_getBZDBDouble("_shockOutRadius") * 0.75;
+
+                    // Check if the player is in the detonation range
+                    if ((playerPos[0] > currentMine.x - shockRange && playerPos[0] < currentMine.x + shockRange) &&
+                        (playerPos[1] > currentMine.y - shockRange && playerPos[1] < currentMine.y + shockRange) &&
+                        (playerPos[2] > currentMine.z - shockRange && playerPos[2] < currentMine.z + shockRange) &&
+                        playerSpawnTime[playerID] + bzdb_SpawnSafetyTime <= bz_getCurrentTime() && !currentMine.detonated)
+                    {
+                        // Check that the mine owner exists and is not an observer
+                        if (bztk_isValidPlayerID(currentMine.owner) && bz_getPlayerTeam(currentMine.owner) != eObservers)
+                        {
+                            // Get the current mine position
+                            float minePos[3] = {currentMine.x, currentMine.y, currentMine.z};
+
+                            // Save who detonated the mine and mark it as detonated
+                            currentMine.victim    = playerID;
+                            currentMine.detonated = true;
+
+                            // BOOM!
+                            bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, currentMine.team);
+                        }
+                        // Just in case the player doesn't exist or is an observer, then remove the mine because it shouldn't be there
+                        else
+                        {
+                            removeMine(i);
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+        break;
+
+        default: break;
+    }
 }
 
-
-void uselessmine::RemoveMine(int id)
+bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString /*message*/, bz_APIStringList *params)
 {
-	mine[id]=0;
+    if (command == "mine")
+    {
+        std::shared_ptr<bz_BasePlayerRecord> playerRecord(bz_getPlayerByIndex(playerID));
+
+        // If the player is not an observer, they let them proceed to the next check
+        if (playerRecord->team != eObservers)
+        {
+            // Check if the player has the Useless flag
+            if (playerRecord->currentFlag == "USeless (+US)")
+            {
+                // Store their current position
+                float currentPosition[3] = {playerRecord->lastKnownState.pos[0], playerRecord->lastKnownState.pos[1], playerRecord->lastKnownState.pos[2]};
+
+                setMine(playerID, currentPosition, playerRecord->team);
+            }
+            else
+            {
+                bz_sendTextMessage(BZ_SERVER, playerID, "You can't place a mine without the Useless flag!");
+            }
+        }
+        else
+        {
+            bz_sendTextMessage(BZ_SERVER, playerID, "Silly observer, you can't place a mine.");
+        }
+
+        return true;
+    }
 }
 
-void uselessmine::RemoveAllMines(int playerID)
+// A shortcut to get the amount of mines that are in play
+int UselessMine::getMineCount()
 {
-	int i;
-	for (i=0;i<255;i++) {
-		if (mine[i] && mineplayer[i]==playerID) {
-			RemoveMine(i);
-		}
-	}
+    return activeMines.size();
 }
 
-bool uselessmine::SlashCommand(int playerID,bz_ApiString command,bz_ApiString message,bz_APIStringList* params)
+// In order to keep things organized, this function is where you can specify all the witty death messages you want to be available
+void UselessMine::initializeMessages()
 {
-	if (!strcmp("mine",command.c_str())) {
-		bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
-		if (pr) {
-			if (pr->currentFlag=="USeless (+US)") {
-				bz_removePlayerFlag(playerID);
-				SetMine(playerID,pr->lastKnownState.pos[0],pr->lastKnownState.pos[1],pr->lastKnownState.pos[2]);
-			}
-			bz_freePlayerRecord(pr);
-		}
-		return 1;
-	}
+    deathMessages.push_back("%s was killed by %s's mine.");
+    deathMessages.push_back("%s was owned by %s's mine.");
+    deathMessages.push_back("%s was obliterated by %s's mine.");
+    deathMessages.push_back("%s's tank disintegrated from %s's mine.");
+    deathMessages.push_back("%s was permanently blinded by the bright light from %s's mine.");
+    deathMessages.push_back("%s was sent shooting into the stars by %s's mine.");
+    deathMessages.push_back("%s was never heard from again thanks to %s's mine.");
+    deathMessages.push_back("We salute %s for taking an atrocious hit from %s's mine.");
+    deathMessages.push_back("%s's mine left %s's tank parts scattered all over.");
+    deathMessages.push_back("%s thought %s's mine was a shiny brand new car.");
+    deathMessages.push_back("%s was bombarded by many concussive attacks from %s's mine.");
+    deathMessages.push_back("%s was ignited by %s's mine.");
+    deathMessages.push_back("%s's mine bursted %s's tank to bite-size flaming pieces.");
+    deathMessages.push_back("%s took a nosedive into %s's mine.");
+    deathMessages.push_back("%s fell face first into %s's mine.");
+    deathMessages.push_back("I knew %s would be clumsy enough to run into %s's mine.");
+    deathMessages.push_back("%s killed %s with a mine. No surprise there.");
+    deathMessages.push_back("DID YOU SEE THAT? %s did total carnage to %s's tank with that one little mine.");
+    deathMessages.push_back("%s purposely ran into %s's mine.");
+    deathMessages.push_back("I ascertain that %s has been ruptured by a mine created from the heavens with the name dubbed %s.");
 }
 
-void uselessmine::Event(bz_EventData *eventData)
+void UselessMine::removeAllMines(int playerID)
 {
-	int playerID = -1;
-	switch (eventData->eventType) {
-		case bz_eFlagGrabbedEvent: {
-			playerID=((bz_FlagGrabbedEventData_V1*)eventData)->playerID;
-			/*bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
-			//bz_debugMessage(0,bz_getName(((bz_FlagGrabbedEventData_V1*)eventData)->flagID).c_str());
-			if (pr) {
-			if (!strcmp(pr->currentFlag.c_str(),"US")) {
-				bz_sendTextMessage(BZ_SERVER,playerID,"You grabbed a Useless flag! Type /mine at any time to set a useless mine!");
-			}
-			bz_freePlayerRecord(pr);
-			}*/
-			minenotify[playerID]=1;
-		}break;
-		case bz_ePlayerPartEvent: {
-			playerID=((bz_PlayerJoinPartEventData_V1*)eventData)->playerID;
-			RemoveAllMines(playerID);
-		}break;
-		case bz_ePlayerUpdateEvent: {
-			int i;
-			playerID=((bz_PlayerUpdateEventData_V1*)eventData)->playerID;
-			bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
-			if (pr) {
-			if (minenotify[playerID] && pr->currentFlag=="USeless (+US)") {bz_sendTextMessage(BZ_SERVER,playerID,"You grabbed a Useless flag! Type /mine at any time to set a useless mine!");
-			minenotify[playerID]=0;}
-			for (i=0;i<255;i++) {
-					if (mine[i] && mineplayer[i]!=playerID && (pr->team==eRogueTeam || pr->team!=mineteam[i])) {
-						if (pr->lastKnownState.pos[0]>minepos[i][0]-((bz_getBZDBDouble("_shockOutRadius")*0.75))
-						&& pr->lastKnownState.pos[0]<minepos[i][0]+((bz_getBZDBDouble("_shockOutRadius")*0.75))
-						&& pr->lastKnownState.pos[1]>minepos[i][1]-((bz_getBZDBDouble("_shockOutRadius")*0.75))
-						&& pr->lastKnownState.pos[1]<minepos[i][1]+((bz_getBZDBDouble("_shockOutRadius")*0.75))
-						&& pr->lastKnownState.pos[2]>minepos[i][2]-((bz_getBZDBDouble("_shockOutRadius")*0.75))
-						&& pr->lastKnownState.pos[2]<minepos[i][2]+((bz_getBZDBDouble("_shockOutRadius")*0.75))
-						&& safetytime[playerID]<=bz_getCurrentTime()
-						) {
-							bz_fireWorldWep("SW",2.0,BZ_SERVER,minepos[i],0,0,i+1000,0);
-							RemoveMine(i);
-						}
-					}
-			}
-			bz_freePlayerRecord(pr);
-			}
-		}break;
-		case bz_ePlayerDieEvent:{
-			playerID=((bz_PlayerDieEventData_V1*)eventData)->playerID;
-			int i;
-			for (i=0;i<255;i++) {
-				if (((bz_PlayerDieEventData_V1*)eventData)->shotID==i+1000) {
-					((bz_PlayerDieEventData_V1*)eventData)->killerID=mineplayer[i];
-					bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
-					bz_BasePlayerRecord *kr = bz_getPlayerByIndex(mineplayer[i]);
-					if (pr || kr) {
-						if (pr && kr) {
-						switch (rand() % 20) {
-							case 0:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was killed by %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 1:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was owned by %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 2:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was obliterated by %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 3:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s's tank disintegrated from %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 4:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was permanently blinded by the bright light from %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 5:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was sent shooting into the stars by %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 6:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was never heard from again thanks to %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 7:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"We salute %s for taking an atrocious hit from %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 8:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s's mine left %s's tank parts scattered all over. [%d]",kr->callsign.c_str(),pr->callsign.c_str(),CountMines());
-							}break;
-							case 9:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s thought %s's mine was a shiny brand new car. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 10:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was bombarded by many concussive attacks from %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 11:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s was ignited by %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 12:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s's mine bursted %s's tank to bite-size flaming pieces. [%d]",kr->callsign.c_str(),pr->callsign.c_str(),CountMines());
-							}break;
-							case 13:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s took a nosedive into %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 14:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s fell face first into %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 15:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"I knew %s would be clumsy enough to run into %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 16:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s killed %s with a mine. No surprise there. [%d]",kr->callsign.c_str(),pr->callsign.c_str(),CountMines());
-							}break;
-							case 17:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"DID YOU SEE THAT? %s did total carnage to %s's tank with that one little mine. [%d]",kr->callsign.c_str(),pr->callsign.c_str(),CountMines());
-							}break;
-							case 18:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"%s purposely ran into %s's mine. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-							case 19:{
-								bz_sendTextMessagef(BZ_SERVER,BZ_ALLUSERS,"I ascertain that %s has been ruptured by a mine created from the heavens with the name dubbed %s. [%d]",pr->callsign.c_str(),kr->callsign.c_str(),CountMines());
-							}break;
-						}
-						}
-						if (pr) {
-					bz_freePlayerRecord(pr);}
-					if (kr) {
-					bz_freePlayerRecord(kr);
-					}
-					}
-				}
-			}
-		}break;
-		case bz_ePlayerSpawnEvent: {
-			playerID=((bz_PlayerSpawnEventData_V1*)eventData)->playerID;
-			safetytime[playerID]=bz_getCurrentTime()+spawnsafetime; //Give a grace time on spawn.
-		}break;
-	}
+    // Go through all of the mines
+    for (int i = 0; i < getMineCount(); i++)
+    {
+        // Quick access mine
+        Mine &currentMine = activeMines.at(i);
+
+        // If the mine belongs to the player, remove it
+        if (currentMine.owner == playerID)
+        {
+            removeMine(i);
+        }
+    }
+}
+
+// A shortcut to remove a mine from play
+void UselessMine::removeMine(int mineIndex)
+{
+    activeMines.erase(activeMines.begin() + mineIndex);
+}
+
+// A shortcut to set a mine
+void UselessMine::setMine(int owner, float pos[3], bz_eTeamType team)
+{
+    // Remove their flag because it's going to be a US flag
+    bz_removePlayerFlag(owner);
+
+    // Push the new mine
+    Mine newMine(owner, pos, team);
+    activeMines.push_back(newMine);
 }
