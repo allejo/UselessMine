@@ -190,7 +190,7 @@ void UselessMine::Event (bz_EventData *eventData)
                             // This mine has been detonated and we're done with the information that we need
                             removeMine(i);
 
-                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, deathMessages.at(randomNumber).c_str(), owner, victim);
+                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, deathMessages.at(randomNumber).c_str(), victim, owner);
                             break;
                         }
                     }
