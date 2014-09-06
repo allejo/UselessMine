@@ -18,6 +18,7 @@ UselessMine
 
 #include <memory>
 #include <stdlib.h>
+#include <string>
 
 #include "bzfsAPI.h"
 #include "bztoolkit/bzToolkitAPI.h"
@@ -29,7 +30,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 13;
+const int BUILD = 14;
 
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
 {
@@ -54,11 +55,12 @@ public:
 
     virtual bool SlashCommand (int playerID, bz_ApiString, bz_ApiString, bz_APIStringList*);
 
-    virtual int  getMineCount ();
-    virtual void initializeMessages (void),
-                 removeAllMines(int playerID),
-                 removeMine (int mineIndex),
-                 setMine (int owner, float pos[3], bz_eTeamType team);
+    virtual int         getMineCount ();
+    virtual void        initializeMessages (void),
+                        removeAllMines(int playerID),
+                        removeMine (int mineIndex),
+                        setMine (int owner, float pos[3], bz_eTeamType team);
+    virtual std::string formatDeathMessage (std::string msg, std::string victim, std::string owner);
 
     // The information each mine will contain
     struct Mine
@@ -197,17 +199,16 @@ void UselessMine::Event (bz_EventData *eventData)
                             const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
                             const char* victim = bz_getPlayerCallsign(detonatedMine.victim);
 
+                            // Get a random death message
+                            std::string deathMessage = deathMessages.at(randomNumber);
+
                             // Attribute the kill to the mine owner
                             dieData->killerID = detonatedMine.owner;
 
                             // This mine has been detonated and we're done with the information that we need
                             removeMine(i);
 
-                            // Get a random death message and replace the %victim% and %owner% placeholders with the appropriate values
-                            std::string deathMessage = deathMessages.at(randomNumber);
-                                        deathMessage = ReplaceString(ReplaceString(deathMessage, "%victim%", victim), "%owner%", owner);
-
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, deathMessage.c_str());
+                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
                             break;
                         }
                     }
@@ -347,6 +348,19 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     }
 }
 
+std::string UselessMine::formatDeathMessage(std::string msg, std::string victim, std::string owner)
+{
+    std::string formattedMessage = ReplaceString(ReplaceString(msg, "%victim%", victim), "%owner%", owner);
+
+    if (formattedMessage.find("%minecount%") != std::string::npos)
+    {
+        formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(getMineCount()));
+    }
+
+    return formattedMessage;
+}
+
+
 // A shortcut to get the amount of mines that are in play
 int UselessMine::getMineCount()
 {
@@ -356,16 +370,16 @@ int UselessMine::getMineCount()
 // In order to keep things organized, this function is where you can specify all the witty death messages you want to be available
 void UselessMine::initializeMessages()
 {
-    deathMessages.push_back("%victim% was killed by %owner%'s mine.");
-    deathMessages.push_back("%victim% was owned by %owner%'s mine.");
-    deathMessages.push_back("%victim% was obliterated by %owner%'s mine.");
-    deathMessages.push_back("%victim%'s tank disintegrated from %owner%'s mine.");
-    deathMessages.push_back("%victim% was permanently blinded by the bright light from %owner%'s mine.");
-    deathMessages.push_back("%victim% was sent shooting into the stars by %owner%'s mine.");
-    deathMessages.push_back("%victim% was never heard from again thanks to %owner%'s mine.");
-    deathMessages.push_back("We salute %owner% for taking an atrocious hit from %owner%'s mine.");
-    deathMessages.push_back("%victim%'s mine left %owner%'s tank parts scattered all over.");
-    deathMessages.push_back("%victim% thought %owner%'s mine was a shiny brand new car.");
+    deathMessages.push_back("%victim% was killed by %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("%victim% was owned by %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("%victim% was obliterated by %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("%victim%'s tank disintegrated from %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("%victim% was permanently blinded by the bright light from %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("%victim% was sent shooting into the stars by %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("%victim% was never heard from again thanks to %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("We salute %owner% for taking an atrocious hit from %owner%'s mine. [%minecount%]");
+    deathMessages.push_back("%victim%'s mine left %owner%'s tank parts scattered all over. [%minecount%]");
+    deathMessages.push_back("%victim% thought %owner%'s mine was a shiny brand new car. [%minecount%]");
     deathMessages.push_back("%victim% was bombarded by many concussive attacks from %owner%'s mine.");
     deathMessages.push_back("%victim% was ignited by %owner%'s mine.");
     deathMessages.push_back("%victim%'s mine bursted %owner%'s tank to bite-size flaming pieces.");
