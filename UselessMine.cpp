@@ -16,6 +16,7 @@ UselessMine
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <fstream>
 #include <memory>
 #include <stdlib.h>
 #include <string>
@@ -30,7 +31,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 14;
+const int BUILD = 15;
 
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
 {
@@ -56,8 +57,7 @@ public:
     virtual bool SlashCommand (int playerID, bz_ApiString, bz_ApiString, bz_APIStringList*);
 
     virtual int         getMineCount ();
-    virtual void        initializeMessages (void),
-                        removeAllMines(int playerID),
+    virtual void        removeAllMines(int playerID),
                         removeMine (int mineIndex),
                         setMine (int owner, float pos[3], bz_eTeamType team);
     virtual std::string formatDeathMessage (std::string msg, std::string victim, std::string owner);
@@ -86,6 +86,8 @@ public:
 
     std::vector<Mine>        activeMines;   // A vector that will store all of the mines that are in play
     std::vector<std::string> deathMessages; // A vector that will store all of the witty death messages
+
+    std::string deathMessagesFile;
 
     double bzdb_SpawnSafetyTime, // The BZDB variable that will store the amount of seconds a player has before a mine is detonated
            playerSpawnTime[256]; // The time of a player's last spawn time used to calculate their safety from detonation
@@ -120,11 +122,31 @@ void UselessMine::Init (const char* commandLine)
     // Register our custom slash commands
     bz_registerCustomSlashCommand("mine", this);
 
-    // Initialize all of the witty death messages
-    initializeMessages();
-
     // Set some custom BZDB variables
     bzdb_SpawnSafetyTime = bztk_registerCustomDoubleBZDB("_mineSafetyTime", 5.0);
+
+    // Save the location of the file so we can reload after
+    deathMessagesFile = commandLine;
+
+    // Open the file of witty death messages
+    std::ifstream file(commandLine);
+    std::string currentLine;
+
+    // If the file exists, read each line
+    if (file)
+    {
+        // Push each line into the deathMessages vector
+        while (std::getline(file, currentLine))
+        {
+            deathMessages.push_back(currentLine);
+        }
+
+        bz_debugMessagef(2, "DEBUG :: Useless Mine :: %d witty messages were loaded", deathMessages.size());
+    }
+    else
+    {
+        bz_debugMessage(2, "WARNING :: Useless Mine :: No witty death messages were loaded");
+    }
 }
 
 void UselessMine::Cleanup (void)
@@ -192,23 +214,27 @@ void UselessMine::Event (bz_EventData *eventData)
                         // Check if the player who just died was killed by the server
                         if (dieData->killerID == 253)
                         {
-                            // The random number used to fetch a random taunting death message
-                            int randomNumber = rand() % deathMessages.size();
-
-                            // Get the callsigns of the players
-                            const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
-                            const char* victim = bz_getPlayerCallsign(detonatedMine.victim);
-
-                            // Get a random death message
-                            std::string deathMessage = deathMessages.at(randomNumber);
-
                             // Attribute the kill to the mine owner
                             dieData->killerID = detonatedMine.owner;
+
+                            // Only get a death messages if death messages exist
+                            if (!deathMessages.empty())
+                            {
+                                // The random number used to fetch a random taunting death message
+                                int randomNumber = rand() % deathMessages.size();
+
+                                // Get the callsigns of the players
+                                const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
+                                const char* victim = bz_getPlayerCallsign(detonatedMine.victim);
+
+                                // Get a random death message
+                                std::string deathMessage = deathMessages.at(randomNumber);
+                                bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
+                            }
 
                             // This mine has been detonated and we're done with the information that we need
                             removeMine(i);
 
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
                             break;
                         }
                     }
@@ -274,8 +300,10 @@ void UselessMine::Event (bz_EventData *eventData)
                 // Make an easy access mine
                 Mine &currentMine = activeMines.at(i);
 
+                std::shared_ptr<bz_BasePlayerRecord> pr(bz_getPlayerByIndex(playerID));
+
                 // If the mine owner is not the player triggering the mine (so no self kills) and the player is a rogue or does is an enemy team relative to the mine owner
-                if (currentMine.owner != playerID && (bz_getPlayerTeam(playerID) == eRogueTeam || bz_getPlayerTeam(playerID) != currentMine.team))
+                if (currentMine.owner != playerID && (pr->team == eRogueTeam || pr->team != currentMine.team) && pr->spawned)
                 {
                     // Make easy to access variables
                     float  playerPos[3] = {updateData->state.pos[0], updateData->state.pos[1], updateData->state.pos[2]};
@@ -365,31 +393,6 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
 int UselessMine::getMineCount()
 {
     return activeMines.size();
-}
-
-// In order to keep things organized, this function is where you can specify all the witty death messages you want to be available
-void UselessMine::initializeMessages()
-{
-    deathMessages.push_back("%victim% was killed by %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("%victim% was owned by %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("%victim% was obliterated by %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("%victim%'s tank disintegrated from %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("%victim% was permanently blinded by the bright light from %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("%victim% was sent shooting into the stars by %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("%victim% was never heard from again thanks to %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("We salute %owner% for taking an atrocious hit from %owner%'s mine. [%minecount%]");
-    deathMessages.push_back("%victim%'s mine left %owner%'s tank parts scattered all over. [%minecount%]");
-    deathMessages.push_back("%victim% thought %owner%'s mine was a shiny brand new car. [%minecount%]");
-    deathMessages.push_back("%victim% was bombarded by many concussive attacks from %owner%'s mine.");
-    deathMessages.push_back("%victim% was ignited by %owner%'s mine.");
-    deathMessages.push_back("%victim%'s mine bursted %owner%'s tank to bite-size flaming pieces.");
-    deathMessages.push_back("%victim% took a nosedive into %owner%'s mine.");
-    deathMessages.push_back("%victim% fell face first into %owner%'s mine.");
-    deathMessages.push_back("I knew %victim% would be clumsy enough to run into %owner%'s mine.");
-    deathMessages.push_back("%owner% killed %victim% with a mine. No surprise there.");
-    deathMessages.push_back("DID YOU SEE THAT? %owner% did total carnage to %victim%'s tank with that one little mine.");
-    deathMessages.push_back("%victim% purposely ran into %owner%'s mine.");
-    deathMessages.push_back("I ascertain that %victim% has been ruptured by a mine created from the heavens with the name dubbed %owner%.");
 }
 
 void UselessMine::removeAllMines(int playerID)
