@@ -68,7 +68,23 @@ Server Details
 
 To use this plugin after it has been compiled, simply load the plugin via the configuration file.
 
-`-loadplugin /path/to/UselessMine.so`
+`-loadplugin /path/to/UselessMine.so,/path/to/UselessMine.deathMessages`
+
+#### Death Messages file
+
+This is an optional file that will store all of the witty death messages announced when a player detonates a mine. If you would like death messages to be announced, you must give the plug-in the file.
+
+In the file, each line is a separate death message. The supported placeholders are the following:
+
+- `%victim%`
+    - The player who got killed by the mine
+- `%owner%`
+    - The player who placed the mine originally
+- `%minecount%`
+    - The remaining amount of mines left on the field
+
+The order in which you use the placeholders doesn't matter and the placeholders can be used several times in the same death message. Both `%victim%` and `%owner%` are required for each death message; `%minecount%` is optional.
+
 
 ### Custom BZDB Variables
 
