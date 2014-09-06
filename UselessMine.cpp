@@ -29,7 +29,20 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 8;
+const int BUILD = 13;
+
+std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
+{
+    size_t pos = 0;
+
+    while((pos = subject.find(search, pos)) != std::string::npos)
+    {
+         subject.replace(pos, search.length(), replace);
+         pos += replace.length();
+    }
+
+    return subject;
+}
 
 class UselessMine : public bz_Plugin, public bz_CustomSlashCommandHandler
 {
@@ -190,7 +203,11 @@ void UselessMine::Event (bz_EventData *eventData)
                             // This mine has been detonated and we're done with the information that we need
                             removeMine(i);
 
-                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, deathMessages.at(randomNumber).c_str(), victim, owner);
+                            // Get a random death message and replace the %victim% and %owner% placeholders with the appropriate values
+                            std::string deathMessage = deathMessages.at(randomNumber);
+                                        deathMessage = ReplaceString(ReplaceString(deathMessage, "%victim%", victim), "%owner%", owner);
+
+                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, deathMessage.c_str());
                             break;
                         }
                     }
@@ -339,26 +356,26 @@ int UselessMine::getMineCount()
 // In order to keep things organized, this function is where you can specify all the witty death messages you want to be available
 void UselessMine::initializeMessages()
 {
-    deathMessages.push_back("%s was killed by %s's mine.");
-    deathMessages.push_back("%s was owned by %s's mine.");
-    deathMessages.push_back("%s was obliterated by %s's mine.");
-    deathMessages.push_back("%s's tank disintegrated from %s's mine.");
-    deathMessages.push_back("%s was permanently blinded by the bright light from %s's mine.");
-    deathMessages.push_back("%s was sent shooting into the stars by %s's mine.");
-    deathMessages.push_back("%s was never heard from again thanks to %s's mine.");
-    deathMessages.push_back("We salute %s for taking an atrocious hit from %s's mine.");
-    deathMessages.push_back("%s's mine left %s's tank parts scattered all over.");
-    deathMessages.push_back("%s thought %s's mine was a shiny brand new car.");
-    deathMessages.push_back("%s was bombarded by many concussive attacks from %s's mine.");
-    deathMessages.push_back("%s was ignited by %s's mine.");
-    deathMessages.push_back("%s's mine bursted %s's tank to bite-size flaming pieces.");
-    deathMessages.push_back("%s took a nosedive into %s's mine.");
-    deathMessages.push_back("%s fell face first into %s's mine.");
-    deathMessages.push_back("I knew %s would be clumsy enough to run into %s's mine.");
-    deathMessages.push_back("%s killed %s with a mine. No surprise there.");
-    deathMessages.push_back("DID YOU SEE THAT? %s did total carnage to %s's tank with that one little mine.");
-    deathMessages.push_back("%s purposely ran into %s's mine.");
-    deathMessages.push_back("I ascertain that %s has been ruptured by a mine created from the heavens with the name dubbed %s.");
+    deathMessages.push_back("%victim% was killed by %owner%'s mine.");
+    deathMessages.push_back("%victim% was owned by %owner%'s mine.");
+    deathMessages.push_back("%victim% was obliterated by %owner%'s mine.");
+    deathMessages.push_back("%victim%'s tank disintegrated from %owner%'s mine.");
+    deathMessages.push_back("%victim% was permanently blinded by the bright light from %owner%'s mine.");
+    deathMessages.push_back("%victim% was sent shooting into the stars by %owner%'s mine.");
+    deathMessages.push_back("%victim% was never heard from again thanks to %owner%'s mine.");
+    deathMessages.push_back("We salute %owner% for taking an atrocious hit from %owner%'s mine.");
+    deathMessages.push_back("%victim%'s mine left %owner%'s tank parts scattered all over.");
+    deathMessages.push_back("%victim% thought %owner%'s mine was a shiny brand new car.");
+    deathMessages.push_back("%victim% was bombarded by many concussive attacks from %owner%'s mine.");
+    deathMessages.push_back("%victim% was ignited by %owner%'s mine.");
+    deathMessages.push_back("%victim%'s mine bursted %owner%'s tank to bite-size flaming pieces.");
+    deathMessages.push_back("%victim% took a nosedive into %owner%'s mine.");
+    deathMessages.push_back("%victim% fell face first into %owner%'s mine.");
+    deathMessages.push_back("I knew %victim% would be clumsy enough to run into %owner%'s mine.");
+    deathMessages.push_back("%owner% killed %victim% with a mine. No surprise there.");
+    deathMessages.push_back("DID YOU SEE THAT? %owner% did total carnage to %victim%'s tank with that one little mine.");
+    deathMessages.push_back("%victim% purposely ran into %owner%'s mine.");
+    deathMessages.push_back("I ascertain that %victim% has been ruptured by a mine created from the heavens with the name dubbed %owner%.");
 }
 
 void UselessMine::removeAllMines(int playerID)
