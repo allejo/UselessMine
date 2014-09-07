@@ -31,8 +31,9 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 15;
+const int BUILD = 17;
 
+// A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
 {
     size_t pos = 0;
@@ -256,6 +257,7 @@ void UselessMine::Event (bz_EventData *eventData)
 
             int playerID = partData->playerID;
 
+            // Remove all the mines belonging to the player who just left
             removeAllMines(playerID);
         }
         break;
@@ -376,10 +378,13 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     }
 }
 
+// A function to format death messages in order to replace placeholders with callsigns and values
 std::string UselessMine::formatDeathMessage(std::string msg, std::string victim, std::string owner)
 {
+    // Replace the %victim% and %owner% placeholders
     std::string formattedMessage = ReplaceString(ReplaceString(msg, "%victim%", victim), "%owner%", owner);
 
+    // If the message has a %minecount%, then replace it
     if (formattedMessage.find("%minecount%") != std::string::npos)
     {
         formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(getMineCount()));
@@ -395,6 +400,7 @@ int UselessMine::getMineCount()
     return activeMines.size();
 }
 
+// Remove all of the mines belonging to a player
 void UselessMine::removeAllMines(int playerID)
 {
     // Go through all of the mines
