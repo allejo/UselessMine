@@ -98,7 +98,7 @@ _mineSafetyTime
 
 ### Using Custom BZDB Variables
 
-Because this plugin utilizes custom BZDB variables, using `-set _ltsKickTime 90` in a configuration file or in an options block will cause an error; instead, `-setforced` must be used to set the value of the custom variable: `-setforced _ltsKickTime 90`. These variables can be set and changed normally in-game with the `/set` command.
+Because this plugin utilizes custom BZDB variables, using `-set _mineSafetyTime 10` in a configuration file or in an options block will cause an error; instead, `-setforced` must be used to set the value of the custom variable: `-setforced _mineSafetyTime 10`. These variables can be set and changed normally in-game with the `/set` command.
 
 ### Custom Slash Commands
 
