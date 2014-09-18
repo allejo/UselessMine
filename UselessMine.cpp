@@ -31,7 +31,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 17;
+const int BUILD = 18;
 
 // A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
@@ -73,6 +73,8 @@ public:
         bz_eTeamType team; // The team of the owner
 
         bool detonated;    // Whether or not the mine has been detonated; to prepare it for removal from play
+        
+        std::vector<int> victims; // The player IDs of players who have fallen victim to this mine
 
         Mine (int _owner, float _pos[3], bz_eTeamType _team) :
             owner(_owner),
@@ -83,6 +85,26 @@ public:
             team(_team),
             detonated(false)
         {}
+        
+        void addVictim(int playerID)
+        {
+            victims.push_back(playerID);
+        }
+        
+        bool hasVictims()
+        {
+            return (victims.size() > 0);
+        }
+        
+        bool isVictim(int playerID)
+        {
+            return (std::find(victims.begin(), victims.end(), playerID) != victims.end());
+        }
+        
+        void removeVictim(int playerID)
+        {
+            victims.erase(victims.begin() + victims);
+        }
     };
 
     std::vector<Mine>        activeMines;   // A vector that will store all of the mines that are in play
@@ -210,7 +232,7 @@ void UselessMine::Event (bz_EventData *eventData)
                 if (detonatedMine.detonated)
                 {
                     // Check if the victim killed is the player who just died
-                    if (detonatedMine.victim == playerID)
+                    if (detonatedMine.isVictim(playerID))
                     {
                         // Check if the player who just died was killed by the server
                         if (dieData->killerID == 253)
@@ -232,9 +254,14 @@ void UselessMine::Event (bz_EventData *eventData)
                                 std::string deathMessage = deathMessages.at(randomNumber);
                                 bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
                             }
-
-                            // This mine has been detonated and we're done with the information that we need
-                            removeMine(i);
+                            
+                            detonatedMine.removeVictim(playerID);
+                            
+                            if (!detonatedMine.hasVictims())
+                            {
+                                // This mine has been detonated and we have no more victims stored so we're done with the information about this mine
+                                removeMine(i);
+                            }
 
                             break;
                         }
@@ -315,20 +342,25 @@ void UselessMine::Event (bz_EventData *eventData)
                     if ((playerPos[0] > currentMine.x - shockRange && playerPos[0] < currentMine.x + shockRange) &&
                         (playerPos[1] > currentMine.y - shockRange && playerPos[1] < currentMine.y + shockRange) &&
                         (playerPos[2] > currentMine.z - shockRange && playerPos[2] < currentMine.z + shockRange) &&
-                        playerSpawnTime[playerID] + bzdb_SpawnSafetyTime <= bz_getCurrentTime() && !currentMine.detonated)
+                        playerSpawnTime[playerID] + bzdb_SpawnSafetyTime <= bz_getCurrentTime())
                     {
                         // Check that the mine owner exists and is not an observer
                         if (bztk_isValidPlayerID(currentMine.owner) && bz_getPlayerTeam(currentMine.owner) != eObservers)
                         {
                             // Get the current mine position
-                            float minePos[3] = {currentMine.x, currentMine.y, currentMine.z};
+                            float minePos[3] = {currentMine.x, currentMine.y, currentMine.z};                 
 
-                            // Save who detonated the mine and mark it as detonated
-                            currentMine.victim    = playerID;
-                            currentMine.detonated = true;
-
-                            // BOOM!
-                            bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, currentMine.team);
+                           // Save who was killed by the mine
+                            currentMine.addVictim(playerID);
+                            
+                            // Only detonate a mine once
+                            if (!currentMine.detonated)
+                            {
+                                currentMine.detonated = true;
+                            
+                                // BOOM!
+                                bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, currentMine.team);
+                            }
                         }
                         // Just in case the player doesn't exist or is an observer, then remove the mine because it shouldn't be there
                         else
