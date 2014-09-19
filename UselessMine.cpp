@@ -31,7 +31,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 21;
+const int BUILD = 24;
 
 // A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
@@ -400,7 +400,9 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
     // If the message has a %minecount%, then replace it
     if (formattedMessage.find("%minecount%") != std::string::npos)
     {
-        formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(getMineCount() - 1));
+    	int minecount = (getMineCount() == 0) ? 0 : getMineCount() - 1;
+
+        formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(minecount));
     }
 
     return formattedMessage;
