@@ -216,9 +216,11 @@ void UselessMine::Event (bz_EventData *eventData)
                         // Check if the player who just died was killed by the server
                         if (dieData->killerID == 253)
                         {
+                            // Easy to access variables
                             float  deathPos[3] = {dieData->state.pos[0], dieData->state.pos[1], dieData->state.pos[2]};
                             double shockRange = bz_getBZDBDouble("_shockOutRadius") * 0.75;
 
+                            // Check if the player died inside of the mine radius
                             if ((deathPos[0] > detonatedMine.x - shockRange && deathPos[0] < detonatedMine.x + shockRange) &&
                                 (deathPos[1] > detonatedMine.y - shockRange && deathPos[1] < detonatedMine.y + shockRange) &&
                                 (deathPos[2] > detonatedMine.z - shockRange && deathPos[2] < detonatedMine.z + shockRange))
@@ -400,6 +402,7 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
     // If the message has a %minecount%, then replace it
     if (formattedMessage.find("%minecount%") != std::string::npos)
     {
+        // Subtract one from the mine count because the mine we're announcing hasn't beeb removed yet
         int minecount = (getMineCount() == 0) ? 0 : getMineCount() - 1;
 
         formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(minecount));
