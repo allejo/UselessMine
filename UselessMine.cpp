@@ -400,7 +400,7 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
     // If the message has a %minecount%, then replace it
     if (formattedMessage.find("%minecount%") != std::string::npos)
     {
-    	int minecount = (getMineCount() == 0) ? 0 : getMineCount() - 1;
+        int minecount = (getMineCount() == 0) ? 0 : getMineCount() - 1;
 
         formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(minecount));
     }
