@@ -9,12 +9,12 @@ UselessMine
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+    along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include <fstream>
 #include <memory>
@@ -31,17 +31,17 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 17;
+const int BUILD = 21;
 
 // A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
 {
     size_t pos = 0;
 
-    while((pos = subject.find(search, pos)) != std::string::npos)
+    while ((pos = subject.find(search, pos)) != std::string::npos)
     {
-         subject.replace(pos, search.length(), replace);
-         pos += replace.length();
+        subject.replace(pos, search.length(), replace);
+        pos += replace.length();
     }
 
     return subject;
@@ -58,7 +58,7 @@ public:
     virtual bool SlashCommand (int playerID, bz_ApiString, bz_ApiString, bz_APIStringList*);
 
     virtual int         getMineCount ();
-    virtual void        removeAllMines(int playerID),
+    virtual void        removeAllMines (int playerID),
                         removeMine (int mineIndex),
                         setMine (int owner, float pos[3], bz_eTeamType team);
     virtual std::string formatDeathMessage (std::string msg, std::string victim, std::string owner);
@@ -66,17 +66,18 @@ public:
     // The information each mine will contain
     struct Mine
     {
-        int owner, victim; // The owner of the mine and the victim, respectively
+        int owner;             // The owner of the mine and the victim, respectively
 
-        float x, y, z;     // The coordinates of where the mine was placed
+        float x, y, z;         // The coordinates of where the mine was placed
 
-        bz_eTeamType team; // The team of the owner
+        bz_eTeamType team;     // The team of the owner
 
-        bool detonated;    // Whether or not the mine has been detonated; to prepare it for removal from play
+        bool detonated;        // Whether or not the mine has been detonated; to prepare it for removal from play
+
+        double detonationTime; // The time the mine was detonated
 
         Mine (int _owner, float _pos[3], bz_eTeamType _team) :
             owner(_owner),
-            victim(-1),
             x(_pos[0]),
             y(_pos[1]),
             z(_pos[2]),
@@ -209,35 +210,44 @@ void UselessMine::Event (bz_EventData *eventData)
                 // Check if the mine has already been detonated
                 if (detonatedMine.detonated)
                 {
-                    // Check if the victim killed is the player who just died
-                    if (detonatedMine.victim == playerID)
+                    // If they were killed within the time the shockwave explodes, then we can safely say they were killed by the mine
+                    if (detonatedMine.detonationTime + bz_getBZDBDouble("_shockAdLife") < bz_getCurrentTime())
                     {
                         // Check if the player who just died was killed by the server
                         if (dieData->killerID == 253)
                         {
-                            // Attribute the kill to the mine owner
-                            dieData->killerID = detonatedMine.owner;
+                            float  deathPos[3] = {dieData->state.pos[0], dieData->state.pos[1], dieData->state.pos[2]};
+                            double shockRange = bz_getBZDBDouble("_shockOutRadius") * 0.75;
 
-                            // Only get a death messages if death messages exist
-                            if (!deathMessages.empty())
+                            if ((deathPos[0] > detonatedMine.x - shockRange && deathPos[0] < detonatedMine.x + shockRange) &&
+                                (deathPos[1] > detonatedMine.y - shockRange && deathPos[1] < detonatedMine.y + shockRange) &&
+                                (deathPos[2] > detonatedMine.z - shockRange && deathPos[2] < detonatedMine.z + shockRange))
                             {
-                                // The random number used to fetch a random taunting death message
-                                int randomNumber = rand() % deathMessages.size();
+                                // Attribute the kill to the mine owner
+                                dieData->killerID = detonatedMine.owner;
 
-                                // Get the callsigns of the players
-                                const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
-                                const char* victim = bz_getPlayerCallsign(detonatedMine.victim);
+                                // Only get a death messages if death messages exist and the player who died is now also the mine owner
+                                if (!deathMessages.empty() && playerID != detonatedMine.owner)
+                                {
+                                    // The random number used to fetch a random taunting death message
+                                    int randomNumber = rand() % deathMessages.size();
 
-                                // Get a random death message
-                                std::string deathMessage = deathMessages.at(randomNumber);
-                                bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
+                                    // Get the callsigns of the players
+                                    const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
+                                    const char* victim = bz_getPlayerCallsign(playerID);
+
+                                    // Get a random death message
+                                    std::string deathMessage = deathMessages.at(randomNumber);
+                                    bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
+                                }
+
+                                break;
                             }
-
-                            // This mine has been detonated and we're done with the information that we need
-                            removeMine(i);
-
-                            break;
                         }
+                    }
+                    else
+                    {
+                        removeMine(i);
                     }
                 }
             }
@@ -286,13 +296,11 @@ void UselessMine::Event (bz_EventData *eventData)
 
             // Data
             // ---
-            //   (int)       playerID  - ID of the player that sent the update
-            //   (float[3])  pos       - The player's current position
-            //   (float[3])  velocity  - The player's current velocity
-            //   (float)     azimuth   - The direction the player is facing
-            //   (float)     angvel    - The player's angular velocity
-            //   (int)       phydrv    - The physics driver the player is on
-            //   (double)    eventTime - The current server time
+            //   (int)                   playerID  - ID of the player that sent the update
+            //   (bz_PlayerUpdateState)  state     - The original state the tank was in
+            //   (bz_PlayerUpdateState)  lastState - The second state the tank is currently in to show there was an update
+            //   (double)                stateTime - The time the state was updated
+            //   (double)                eventTime - The current server time
 
             int playerID = updateData->playerID;
 
@@ -315,7 +323,7 @@ void UselessMine::Event (bz_EventData *eventData)
                     if ((playerPos[0] > currentMine.x - shockRange && playerPos[0] < currentMine.x + shockRange) &&
                         (playerPos[1] > currentMine.y - shockRange && playerPos[1] < currentMine.y + shockRange) &&
                         (playerPos[2] > currentMine.z - shockRange && playerPos[2] < currentMine.z + shockRange) &&
-                        playerSpawnTime[playerID] + bzdb_SpawnSafetyTime <= bz_getCurrentTime() && !currentMine.detonated)
+                        playerSpawnTime[playerID] + bzdb_SpawnSafetyTime <= bz_getCurrentTime())
                     {
                         // Check that the mine owner exists and is not an observer
                         if (bztk_isValidPlayerID(currentMine.owner) && bz_getPlayerTeam(currentMine.owner) != eObservers)
@@ -323,12 +331,15 @@ void UselessMine::Event (bz_EventData *eventData)
                             // Get the current mine position
                             float minePos[3] = {currentMine.x, currentMine.y, currentMine.z};
 
-                            // Save who detonated the mine and mark it as detonated
-                            currentMine.victim    = playerID;
-                            currentMine.detonated = true;
+                            // Only detonate a mine once
+                            if (!currentMine.detonated)
+                            {
+                                currentMine.detonated = true;
+                                currentMine.detonationTime = bz_getCurrentTime();
 
-                            // BOOM!
-                            bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, currentMine.team);
+                                // BOOM!
+                                bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, currentMine.team);
+                            }
                         }
                         // Just in case the player doesn't exist or is an observer, then remove the mine because it shouldn't be there
                         else
@@ -376,6 +387,8 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
 
         return true;
     }
+
+    return true;
 }
 
 // A function to format death messages in order to replace placeholders with callsigns and values
