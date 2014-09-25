@@ -31,7 +31,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 27;
+const int BUILD = 28;
 
 // A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
@@ -211,7 +211,7 @@ void UselessMine::Event (bz_EventData *eventData)
                 if (detonatedMine.detonated)
                 {
                     // If they were killed within the time the shockwave explodes, then we can safely say they were killed by the mine
-                    if (detonatedMine.detonationTime + bz_getBZDBDouble("_shockAdLife") < bz_getCurrentTime())
+                    if (detonatedMine.detonationTime + bz_getBZDBDouble("_shockAdLife") > bz_getCurrentTime())
                     {
                         // Check if the player who just died was killed by the server
                         if (dieData->killerID == 253)
