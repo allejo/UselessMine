@@ -93,6 +93,8 @@ public:
 
     double bzdb_SpawnSafetyTime, // The BZDB variable that will store the amount of seconds a player has before a mine is detonated
            playerSpawnTime[256]; // The time of a player's last spawn time used to calculate their safety from detonation
+
+    bool   openFFA;
 };
 
 BZ_PLUGIN(UselessMine)
@@ -130,9 +132,12 @@ void UselessMine::Init (const char* commandLine)
     // Save the location of the file so we can reload after
     deathMessagesFile = commandLine;
 
+    // We'll ignore team colors if it's an Open FFA game
+    openFFA = (bz_getGameType() == eOpenFFAGame);
+
     // Open the file of witty death messages
     std::ifstream file(commandLine);
-    std::string currentLine;
+    std::string   currentLine;
 
     // If the file exists, read each line
     if (file)
@@ -167,14 +172,6 @@ void UselessMine::Event (bz_EventData *eventData)
         {
             bz_FlagGrabbedEventData_V1* flagGrabData = (bz_FlagGrabbedEventData_V1*)eventData;
 
-            // Data
-            // ---
-            //    (int)           playerID  - The player that grabbed the flag
-            //    (int)           flagID    - The flag ID that was grabbed
-            //    (bz_ApiString)  flagType  - The flag abbreviation of the flag that was grabbed
-            //    (float[3])      pos       - The position at which the flag was grabbed
-            //    (double)        eventTime - This value is the local server time of the event.
-
             // If the user grabbed the Useless flag, let them know they can place a mine
             if (strcmp(flagGrabData->flagType, "US") == 0)
             {
@@ -188,17 +185,6 @@ void UselessMine::Event (bz_EventData *eventData)
         {
             bz_PlayerDieEventData_V1* dieData = (bz_PlayerDieEventData_V1*)eventData;
 
-            // Data
-            // ---
-            //   (int)                   playerID       - ID of the player who was killed.
-            //   (bz_eTeamType)          team           - The team the killed player was on.
-            //   (int)                   killerID       - The owner of the shot that killed the player, or BZ_SERVER for server side kills
-            //   (bz_eTeamType)          killerTeam     - The team the owner of the shot was on.
-            //   (bz_ApiString)          flagKilledWith - The flag name the owner of the shot had when the shot was fired.
-            //   (int)                   shotID         - The shot ID that killed the player, if the player was not killed by a shot, the id will be -1.
-            //   (bz_PlayerUpdateState)  state          - The state record for the killed player at the time of the event
-            //   (double)                eventTime      - Time of the event on the server.
-
             int playerID = dieData->playerID;
 
             // Loop through all the mines in play
@@ -210,42 +196,38 @@ void UselessMine::Event (bz_EventData *eventData)
                 // Check if the mine has already been detonated
                 if (detonatedMine.detonated)
                 {
-                    // If they were killed within the time the shockwave explodes, then we can safely say they were killed by the mine
-                    if (detonatedMine.detonationTime + bz_getBZDBDouble("_shockAdLife") > bz_getCurrentTime())
-                    {
-                        // Check if the player who just died was killed by the server
-                        if (dieData->killerID == 253)
-                        {
-                            // Easy to access variables
-                            float  deathPos[3] = {dieData->state.pos[0], dieData->state.pos[1], dieData->state.pos[2]};
-                            double shockRange = bz_getBZDBDouble("_shockOutRadius") * 0.75;
+		    // Check if the player who just died was killed by the server
+		    if (dieData->killerID == 253)
+		    {
+			// Easy to access variables
+			float  deathPos[3] = {dieData->state.pos[0], dieData->state.pos[1], dieData->state.pos[2]};
+			double shockRange = bz_getBZDBDouble("_shockOutRadius") * 0.75;
 
-                            // Check if the player died inside of the mine radius
-                            if ((deathPos[0] > detonatedMine.x - shockRange && deathPos[0] < detonatedMine.x + shockRange) &&
-                                (deathPos[1] > detonatedMine.y - shockRange && deathPos[1] < detonatedMine.y + shockRange) &&
-                                (deathPos[2] > detonatedMine.z - shockRange && deathPos[2] < detonatedMine.z + shockRange))
-                            {
-                                // Attribute the kill to the mine owner
-                                dieData->killerID = detonatedMine.owner;
+			// Check if the player died inside of the mine radius
+			if ((deathPos[0] > detonatedMine.x - shockRange && deathPos[0] < detonatedMine.x + shockRange) &&
+			    (deathPos[1] > detonatedMine.y - shockRange && deathPos[1] < detonatedMine.y + shockRange) &&
+			    (deathPos[2] > detonatedMine.z - shockRange && deathPos[2] < detonatedMine.z + shockRange))
+			{
+			    // Attribute the kill to the mine owner
+			    dieData->killerID = detonatedMine.owner;
 
-                                // Only get a death messages if death messages exist and the player who died is now also the mine owner
-                                if (!deathMessages.empty() && playerID != detonatedMine.owner)
-                                {
-                                    // The random number used to fetch a random taunting death message
-                                    int randomNumber = rand() % deathMessages.size();
+			    // Only get a death messages if death messages exist and the player who died is now also the mine owner
+			    if (!deathMessages.empty() && playerID != detonatedMine.owner)
+			    {
+				// The random number used to fetch a random taunting death message
+				int randomNumber = rand() % deathMessages.size();
 
-                                    // Get the callsigns of the players
-                                    const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
-                                    const char* victim = bz_getPlayerCallsign(playerID);
+				// Get the callsigns of the players
+				const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
+				const char* victim = bz_getPlayerCallsign(playerID);
 
-                                    // Get a random death message
-                                    std::string deathMessage = deathMessages.at(randomNumber);
-                                    bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
-                                }
+				// Get a random death message
+				std::string deathMessage = deathMessages.at(randomNumber);
+				bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
+			    }
 
-                                break;
-                            }
-                        }
+			    break;
+			}
                     }
                     else
                     {
@@ -260,13 +242,6 @@ void UselessMine::Event (bz_EventData *eventData)
         {
             bz_PlayerJoinPartEventData_V1* partData = (bz_PlayerJoinPartEventData_V1*)eventData;
 
-            // Data
-            // ---
-            //    (int)                   playerID  - The player ID that is leaving
-            //    (bz_BasePlayerRecord*)  record    - The player record for the leaving player
-            //    (bz_ApiString)          reason    - The reason for leaving, such as a kick or a ban
-            //    (double)                eventTime - Time of event.
-
             int playerID = partData->playerID;
 
             // Remove all the mines belonging to the player who just left
@@ -277,13 +252,6 @@ void UselessMine::Event (bz_EventData *eventData)
         case bz_ePlayerSpawnEvent: // This event is called each time a playing tank is being spawned into the world
         {
             bz_PlayerSpawnEventData_V1* spawnData = (bz_PlayerSpawnEventData_V1*)eventData;
-
-            // Data
-            // ---
-            //    (int)                   playerID  - ID of the player who was added to the world.
-            //    (bz_eTeamType)          team      - The team the player is a member of.
-            //    (bz_PlayerUpdateState)  state     - The state record for the spawning player
-            //    (double)                eventTime - Time local server time for the event.
 
             int playerID = spawnData->playerID;
 
@@ -296,14 +264,6 @@ void UselessMine::Event (bz_EventData *eventData)
         {
             bz_PlayerUpdateEventData_V1* updateData = (bz_PlayerUpdateEventData_V1*)eventData;
 
-            // Data
-            // ---
-            //   (int)                   playerID  - ID of the player that sent the update
-            //   (bz_PlayerUpdateState)  state     - The original state the tank was in
-            //   (bz_PlayerUpdateState)  lastState - The second state the tank is currently in to show there was an update
-            //   (double)                stateTime - The time the state was updated
-            //   (double)                eventTime - The current server time
-
             int playerID = updateData->playerID;
 
             // Loop through all of the players
@@ -312,10 +272,10 @@ void UselessMine::Event (bz_EventData *eventData)
                 // Make an easy access mine
                 Mine &currentMine = activeMines.at(i);
 
-                std::shared_ptr<bz_BasePlayerRecord> pr(bz_getPlayerByIndex(playerID));
+                std::unique_ptr<bz_BasePlayerRecord> pr(bz_getPlayerByIndex(playerID));
 
                 // If the mine owner is not the player triggering the mine (so no self kills) and the player is a rogue or does is an enemy team relative to the mine owner
-                if (currentMine.owner != playerID && (pr->team == eRogueTeam || pr->team != currentMine.team) && pr->spawned)
+                if (currentMine.owner != playerID && (pr->team == eRogueTeam || pr->team != currentMine.team || openFFA) && pr->spawned)
                 {
                     // Make easy to access variables
                     float  playerPos[3] = {updateData->state.pos[0], updateData->state.pos[1], updateData->state.pos[2]};
@@ -364,7 +324,7 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
 {
     if (command == "mine")
     {
-        std::shared_ptr<bz_BasePlayerRecord> playerRecord(bz_getPlayerByIndex(playerID));
+        std::unique_ptr<bz_BasePlayerRecord> playerRecord(bz_getPlayerByIndex(playerID));
 
         // If the player is not an observer, they let them proceed to the next check
         if (playerRecord->team != eObservers)
