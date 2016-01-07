@@ -30,8 +30,8 @@ const std::string PLUGIN_NAME = "Useless Mine";
 // Define plugin version numbering
 const int MAJOR = 1;
 const int MINOR = 0;
-const int REV = 0;
-const int BUILD = 28;
+const int REV = 1;
+const int BUILD = 29;
 
 // A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
