@@ -1,6 +1,6 @@
 /*
 UselessMine
-    Copyright (C) 2014 Vladimir "allejo" Jimenez
+    Copyright (C) 2016 Vladimir "allejo" Jimenez
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -196,38 +196,38 @@ void UselessMine::Event (bz_EventData *eventData)
                 // Check if the mine has already been detonated
                 if (detonatedMine.detonated)
                 {
-		    // Check if the player who just died was killed by the server
-		    if (dieData->killerID == 253)
-		    {
-			// Easy to access variables
-			float  deathPos[3] = {dieData->state.pos[0], dieData->state.pos[1], dieData->state.pos[2]};
-			double shockRange = bz_getBZDBDouble("_shockOutRadius") * 0.75;
+                    // Check if the player who just died was killed by the server
+                    if (dieData->killerID == 253)
+                    {
+                        // Easy to access variables
+                        float  deathPos[3] = {dieData->state.pos[0], dieData->state.pos[1], dieData->state.pos[2]};
+                        double shockRange = bz_getBZDBDouble("_shockOutRadius") * 0.75;
 
-			// Check if the player died inside of the mine radius
-			if ((deathPos[0] > detonatedMine.x - shockRange && deathPos[0] < detonatedMine.x + shockRange) &&
-			    (deathPos[1] > detonatedMine.y - shockRange && deathPos[1] < detonatedMine.y + shockRange) &&
-			    (deathPos[2] > detonatedMine.z - shockRange && deathPos[2] < detonatedMine.z + shockRange))
-			{
-			    // Attribute the kill to the mine owner
-			    dieData->killerID = detonatedMine.owner;
+                        // Check if the player died inside of the mine radius
+                        if ((deathPos[0] > detonatedMine.x - shockRange && deathPos[0] < detonatedMine.x + shockRange) &&
+                            (deathPos[1] > detonatedMine.y - shockRange && deathPos[1] < detonatedMine.y + shockRange) &&
+                            (deathPos[2] > detonatedMine.z - shockRange && deathPos[2] < detonatedMine.z + shockRange))
+                        {
+                            // Attribute the kill to the mine owner
+                            dieData->killerID = detonatedMine.owner;
 
-			    // Only get a death messages if death messages exist and the player who died is now also the mine owner
-			    if (!deathMessages.empty() && playerID != detonatedMine.owner)
-			    {
-				// The random number used to fetch a random taunting death message
-				int randomNumber = rand() % deathMessages.size();
+                            // Only get a death messages if death messages exist and the player who died is now also the mine owner
+                            if (!deathMessages.empty() && playerID != detonatedMine.owner)
+                            {
+                                // The random number used to fetch a random taunting death message
+                                int randomNumber = rand() % deathMessages.size();
 
-				// Get the callsigns of the players
-				const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
-				const char* victim = bz_getPlayerCallsign(playerID);
+                                // Get the callsigns of the players
+                                const char* owner  = bz_getPlayerCallsign(detonatedMine.owner);
+                                const char* victim = bz_getPlayerCallsign(playerID);
 
-				// Get a random death message
-				std::string deathMessage = deathMessages.at(randomNumber);
-				bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
-			    }
+                                // Get a random death message
+                                std::string deathMessage = deathMessages.at(randomNumber);
+                                bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
+                            }
 
-			    break;
-			}
+                            break;
+                        }
                     }
                     else
                     {
@@ -411,3 +411,4 @@ void UselessMine::setMine(int owner, float pos[3], bz_eTeamType team)
     Mine newMine(owner, pos, team);
     activeMines.push_back(newMine);
 }
+
