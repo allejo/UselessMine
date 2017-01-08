@@ -10,10 +10,11 @@ AM_CFLAGS = $(CONF_CFLAGS)
 AM_CXXFLAGS = $(CONF_CXXFLAGS)
 
 EXTRA_DIST = \
-	README.txt \
+	CHANGELOG.md \
+	LICENSE.md \
+	README.md \
 	UselessMine.def \
-	UselessMine.sln \
-	UselessMine.vcxproj
+	UselessMine.deathMessages
 
 MAINTAINERCLEANFILES =	\
 	Makefile.in

@@ -1,116 +1,62 @@
-UselessMine
-===========
+# UselessMine
+
+[![GitHub release](https://img.shields.io/github/release/allejo/UselessMine.svg)](https://github.com/allejo/UselessMine/releases/latest)
+![Minimum BZFlag Version](https://img.shields.io/badge/BZFlag-v2.4.0+-blue.svg)
+[![License](https://img.shields.io/github/license/allejo/UselessMine.svg)](https://github.com/allejo/UselessMine/blob/master/LICENSE.md)
 
 A BZFlag plug-in that allows players to convert the Useless flag into mines to kill other players simply by typing '/mine' while carrying a Useless flag.
 
 The [original plug-in](http://forums.bzflag.org/viewtopic.php?f=79&t=10340&p=103683) was written by Enigma, then there was a more optimized [rewrite released](http://forums.bzflag.org/viewtopic.php?f=79&t=17630) by sigonasr2, and lastly there is this rewrite. This implementation follows sigonasr2's implementation and is very similar in regards to how it works and the messages that are used during at deaths.
 
-Author
--------
-
-- Vladimir "allejo" Jimenez
-
-Compiling
----------
-
-### Requirements
+## Compiling Requirements
 
 - BZFlag 2.4.0+
+- [bztoolkit](https://github.com/allejo/bztoolkit)
+- C++11
 
-- [bzToolkit](https://github.com/allejo/bztoolkit/)
+This plug-in follows [my standard instructions for compiling plug-ins](https://github.com/allejo/docs/wiki/BZFlag-Plugin-Distribution).
 
-### How To Compile
+## Usage
 
-1.  Check out the BZFlag source code.
+### Loading the plug-in
 
-    `git clone -b 2.4 https://github.com/BZFlag-Dev/bzflag.git`
+This plug-in accepts the path to a [text file](https://github.com/allejo/UselessMine/blob/master/UselessMine.deathMessages) containing death messages when loaded. If a text file is not given when loaded, no death messages will be announced when mines are exploded.
 
-2.  Go into the newly checked out source code and then the plugins directory.
+```
+-loadplugin lastTankStanding,/path/to/UselessMine.deathMessages
+```
 
-    `cd bzflag/plugins`
+### Custom BZDB Variables
 
-3.  Run a git clone of this repository from within the plugins directory. This should have created a new UselessMine directory within the plugins directory.
+These custom BZDB variables must be used with `-setforced`, which sets BZDB variable `<name>` to `<value>`, even if the variable does not exist. These variables may changed at any time in-game by using the `/set` command.
 
-    `git clone https://github.com/allejo/UselessMine.git`
+```
+-setforced <name> <value>
+```
 
-4.  Create a plugin using the `addToBuild.sh` script.
+| Name | Type | Default | Description |
+| ---- | ---- | ------- | ----------- |
+| `_mineSafetyTime` | int | 5 | The number of seconds a player has to leave the mine detonation radius if they accidentally spawn in it |
 
-    `sh addToBuild.sh UselessMine`
+### Custom Slash Commands
 
-5.  Now you will need to checkout the required submodules so the plugin has the proper dependencies so it can compile properly.
+| Command | Permission | Description |
+| ------- | ---------- | ----------- |
+| `/mine` | N/A | Lay a mine |
+| `/reload deathmessages` | setAll | Reload the death messages |
 
-    `cd UselessMine; git submodule update --init`
-
-6.  Instruct the build system to generate a Makefile and then compile and install the plugin.
-
-    `cd ../..; ./autogen.sh; ./configure; make; make install;`
-    
-### Updating the Plugin
-
-1.  Go into the UselessMine folder located in your plugins folder.
-
-2.  Pull the changes from Git.
-
-    `git pull origin master`
-
-3.  (Optional) If you have made local changes to any of the files from this project, you may receive conflict errors where you may resolve the conflicts yourself or you may simply overwrite your changes with whatever is in the repository, which is recommended. *If you have a conflict every time you update because of your local change, submit a pull request and it will be accepted, provided it's a reasonable change.*
-
-    `git reset --hard origin/master; git pull`
-
-4.  Compile the changes.
-
-    `make; make install;`
-
-Server Details
---------------
-
-### How to Use
-
-To use this plugin after it has been compiled, simply load the plugin via the configuration file.
-
-`-loadplugin /path/to/UselessMine.so,/path/to/UselessMine.deathMessages`
-
-#### Death Messages file
+### Custom Death Messages file
 
 This is an optional file that will store all of the witty death messages announced when a player detonates a mine. If you would like death messages to be announced, you must give the plug-in the file.
 
 In the file, each line is a separate death message. The supported placeholders are the following:
 
-- `%victim%`
-    - The player who got killed by the mine
-- `%owner%`
-    - The player who placed the mine originally
-- `%minecount%`
-    - The remaining amount of mines left on the field
+- `%victim%` - The player who got killed by the mine
+- `%owner%` - The player who placed the mine originally
+- `%minecount%` - The remaining amount of mines left on the field
 
 The order in which you use the placeholders doesn't matter and the placeholders can be used several times in the same death message. Both `%victim%` and `%owner%` are required for each death message; `%minecount%` is optional.
 
+## License
 
-### Custom BZDB Variables
-
-    _mineSafetyTime
-
-_mineSafetyTime
-
-- Default: *5.0*
-
-- Description: The number of seconds a player has to leave the mine detonation radius if they accidentally spawn in it.
-
-### Using Custom BZDB Variables
-
-Because this plugin utilizes custom BZDB variables, using `-set _mineSafetyTime 10` in a configuration file or in an options block will cause an error; instead, `-setforced` must be used to set the value of the custom variable: `-setforced _mineSafetyTime 10`. These variables can be set and changed normally in-game with the `/set` command.
-
-### Custom Slash Commands
-
-    /mine
-
-/mine
-
-- Permission Requirement: Non-observer
-
-- Description: Place a mine
-
-License
--------
-
-[GNU General Public License Version 3](https://github.com/allejo/UselessMine/blob/master/LICENSE.md)
+[MIT](https://github.com/allejo/UselessMine/blob/master/LICENSE.md)
