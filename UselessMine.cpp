@@ -285,7 +285,7 @@ void UselessMine::Event (bz_EventData *eventData)
                     if ((playerPos[0] > currentMine.x - shockRange && playerPos[0] < currentMine.x + shockRange) &&
                         (playerPos[1] > currentMine.y - shockRange && playerPos[1] < currentMine.y + shockRange) &&
                         (playerPos[2] > currentMine.z - shockRange && playerPos[2] < currentMine.z + shockRange) &&
-                        playerSpawnTime[playerID] + bzdb_SpawnSafetyTime <= bz_getCurrentTime())
+                        playerSpawnTime[playerID] + bz_getBZDBDouble("_mineSafetyTime") <= bz_getCurrentTime())
                     {
                         // Check that the mine owner exists and is not an observer
                         if (bztk_isValidPlayerID(currentMine.owner) && bz_getPlayerTeam(currentMine.owner) != eObservers)
