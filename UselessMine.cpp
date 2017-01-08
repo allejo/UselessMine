@@ -1,6 +1,6 @@
 /*
 UselessMine
-    Copyright (C) 2016 Vladimir "allejo" Jimenez
+    Copyright (C) 2013-2017 Vladimir "allejo" Jimenez
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,19 +19,18 @@ UselessMine
 #include <fstream>
 #include <memory>
 #include <stdlib.h>
-#include <string>
 
 #include "bzfsAPI.h"
 #include "bztoolkit/bzToolkitAPI.h"
 
 // Define plugin name
-const std::string PLUGIN_NAME = "Useless Mine";
+std::string PLUGIN_NAME = "Useless Mine";
 
 // Define plugin version numbering
-const int MAJOR = 1;
-const int MINOR = 0;
-const int REV = 1;
-const int BUILD = 29;
+int MAJOR = 1;
+int MINOR = 0;
+int REV = 2;
+int BUILD = 44;
 
 // A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
@@ -58,7 +57,8 @@ public:
     virtual bool SlashCommand (int playerID, bz_ApiString, bz_ApiString, bz_APIStringList*);
 
     virtual int         getMineCount ();
-    virtual void        removeAllMines (int playerID),
+    virtual void        reloadDeathMessages (),
+                        removeAllMines (int playerID),
                         removeMine (int mineIndex),
                         setMine (int owner, float pos[3], bz_eTeamType team);
     virtual std::string formatDeathMessage (std::string msg, std::string victim, std::string owner);
@@ -91,9 +91,7 @@ public:
 
     std::string deathMessagesFile;
 
-    double bzdb_SpawnSafetyTime, // The BZDB variable that will store the amount of seconds a player has before a mine is detonated
-           playerSpawnTime[256]; // The time of a player's last spawn time used to calculate their safety from detonation
-
+    double playerSpawnTime[256]; // The time of a player's last spawn time used to calculate their safety from detonation
     bool   openFFA;
 };
 
@@ -101,17 +99,7 @@ BZ_PLUGIN(UselessMine)
 
 const char* UselessMine::Name (void)
 {
-    static std::string pluginBuild = "";
-
-    if (!pluginBuild.size())
-    {
-        std::ostringstream pluginBuildStream;
-
-        pluginBuildStream << PLUGIN_NAME << " " << MAJOR << "." << MINOR << "." << REV << " (" << BUILD << ")";
-        pluginBuild = pluginBuildStream.str();
-    }
-
-    return pluginBuild.c_str();
+    return bztk_pluginName();
 }
 
 void UselessMine::Init (const char* commandLine)
@@ -125,9 +113,10 @@ void UselessMine::Init (const char* commandLine)
 
     // Register our custom slash commands
     bz_registerCustomSlashCommand("mine", this);
+    bz_registerCustomSlashCommand("reload", this);
 
     // Set some custom BZDB variables
-    bzdb_SpawnSafetyTime = bztk_registerCustomDoubleBZDB("_mineSafetyTime", 5.0);
+    bztk_registerCustomDoubleBZDB("_mineSafetyTime", 5.0);
 
     // Save the location of the file so we can reload after
     deathMessagesFile = commandLine;
@@ -135,33 +124,20 @@ void UselessMine::Init (const char* commandLine)
     // We'll ignore team colors if it's an Open FFA game
     openFFA = (bz_getGameType() == eOpenFFAGame);
 
-    // Open the file of witty death messages
-    std::ifstream file(commandLine);
-    std::string   currentLine;
+    reloadDeathMessages();
 
-    // If the file exists, read each line
-    if (file)
-    {
-        // Push each line into the deathMessages vector
-        while (std::getline(file, currentLine))
-        {
-            deathMessages.push_back(currentLine);
-        }
-
-        bz_debugMessagef(2, "DEBUG :: Useless Mine :: %d witty messages were loaded", deathMessages.size());
-    }
-    else
-    {
+    if (deathMessages.empty())
         bz_debugMessage(2, "WARNING :: Useless Mine :: No witty death messages were loaded");
-    }
+    else
+        bz_debugMessagef(2, "DEBUG :: Useless Mine :: %d witty messages were loaded", deathMessages.size());
 }
 
 void UselessMine::Cleanup (void)
 {
-    Flush(); // Clean up all the events
+    Flush();
 
-    // Clean up our custom slash commands
     bz_removeCustomSlashCommand("mine");
+    bz_removeCustomSlashCommand("reload");
 }
 
 void UselessMine::Event (bz_EventData *eventData)
@@ -179,7 +155,6 @@ void UselessMine::Event (bz_EventData *eventData)
             }
         }
         break;
-
 
         case bz_ePlayerDieEvent: // This event is called each time a tank is killed.
         {
@@ -326,7 +301,6 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     {
         std::unique_ptr<bz_BasePlayerRecord> playerRecord(bz_getPlayerByIndex(playerID));
 
-        // If the player is not an observer, they let them proceed to the next check
         if (playerRecord->team != eObservers)
         {
             // Check if the player has the Useless flag
@@ -349,8 +323,17 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
 
         return true;
     }
+    else if (command == "reload")
+    {
+        if (bz_hasPerm(playerID, "setAll") && params->get(0) == "deathmessages")
+        {
+            reloadDeathMessages();
+            bz_sendTextMessage(BZ_SERVER, playerID, "Death messages reloaded");
+            return true;
+        }
+    }
 
-    return true;
+    return false;
 }
 
 // A function to format death messages in order to replace placeholders with callsigns and values
@@ -362,7 +345,7 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
     // If the message has a %minecount%, then replace it
     if (formattedMessage.find("%minecount%") != std::string::npos)
     {
-        // Subtract one from the mine count because the mine we're announcing hasn't beeb removed yet
+        // Subtract one from the mine count because the mine we're announcing hasn't been removed yet
         int minecount = (getMineCount() == 0) ? 0 : getMineCount() - 1;
 
         formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(minecount));
@@ -371,8 +354,16 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
     return formattedMessage;
 }
 
+void UselessMine::reloadDeathMessages()
+{
+    deathMessages.clear();
 
-// A shortcut to get the amount of mines that are in play
+    if (!deathMessagesFile.empty())
+    {
+        bztk_fileToVector(deathMessagesFile.c_str(), deathMessages);
+    }
+}
+
 int UselessMine::getMineCount()
 {
     return activeMines.size();
@@ -411,4 +402,3 @@ void UselessMine::setMine(int owner, float pos[3], bz_eTeamType team)
     Mine newMine(owner, pos, team);
     activeMines.push_back(newMine);
 }
-
