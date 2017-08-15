@@ -14,7 +14,7 @@ The [original plug-in](http://forums.bzflag.org/viewtopic.php?f=79&t=10340&p=103
 - [bztoolkit](https://github.com/allejo/bztoolkit)
 - C++11
 
-This plug-in follows [my standard instructions for compiling plug-ins](https://github.com/allejo/docs/wiki/BZFlag-Plugin-Distribution).
+This plug-in follows [my standard instructions for compiling plug-ins](https://github.com/allejo/docs.allejo.io/wiki/BZFlag-Plug-in-Distribution).
 
 ## Usage
 
@@ -29,26 +29,27 @@ This plug-in accepts the path to a [text file](https://github.com/allejo/Useless
 ### Custom Flags
 
 | Name | Abbv | Description |
-| ---- | ---- | ----------- |
+| ---- | :--: | ----------- |
 | Bomb&nbsp;Defusal | `BD` | If carried over a mine's location, the mine will instead detonate at the owner's current location; points will be given to the player carrying the `+BD` flag. |
 
 ### Custom BZDB Variables
 
-These custom BZDB variables must be used with `-setforced`, which sets BZDB variable `<name>` to `<value>`, even if the variable does not exist. These variables may changed at any time in-game by using the `/set` command.
+These custom BZDB variables must be used with `-setforced`, which sets BZDB variable `<name>` to `<value>`, even if the variable does not exist. These variables may be changed at any time in-game by using the `/set` command.
 
 ```
 -setforced <name> <value>
 ```
 
 | Name | Type | Default | Description |
-| ---- | ---- | ------- | ----------- |
-| `_mineSafetyTime` | int | 5 | The number of seconds a player has to leave the mine detonation radius if they accidentally spawn in it |
+| ---- | :--: | :-----: | ----------- |
+| `_mineSafetyTime` | int | 5 | The number of seconds a player has to leave the mine detonation radius if they accidentally spawn in it. |
 
 ### Custom Slash Commands
 
 | Command | Permission | Description |
-| ------- | ---------- | ----------- |
+| ------- | :--------: | ----------- |
 | `/mine` | N/A | Lay a mine |
+| `/reload` | setAll | Reload the death messages |
 | `/reload deathmessages` | setAll | Reload the death messages |
 
 ### Custom Death Messages file
