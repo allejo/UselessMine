@@ -142,7 +142,6 @@ public:
                     detonated = true;
                     detonationTime = bz_getCurrentTime();
 
-                    // BOOM!
                     bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, &detonationID, 0, team);
 
                     return true;
@@ -154,18 +153,18 @@ public:
     };
 
 private:
-    virtual int         getMineCount (bool offset);
-    virtual void        reloadDeathMessages (),
-                        removePlayerMines (int playerID),
-                        removeMine (Mine &mine),
-                        setMine (int owner, float pos[3], bz_eTeamType team);
-    virtual std::string formatDeathMessage (std::string msg, std::string victim, std::string owner);
+    int  getMineCount (bool offset);
+    void reloadDeathMessages (),
+         removePlayerMines (int playerID),
+         removeMine (Mine &mine),
+         setMine (int owner, float pos[3], bz_eTeamType team);
+    std::string formatDeathMessage (std::string msg, std::string victim, std::string owner);
 
-    std::string deathMessagesFile;
     std::vector<std::string> deathMessages; // A vector that will store all of the witty death messages
-    std::vector<Mine> activeMines; // A vector that will store all of the detonated mines queued for removal
+    std::vector<Mine> activeMines; // A vector that will store all of the mines currently on the field
+    std::string deathMessagesFile; // The path to the file containing death messages
 
-    double playerSpawnTime[256];
+    double playerSpawnTime[256]; // The time a player spawned last; used for _mineSafetyTime calculations
 };
 
 BZ_PLUGIN(UselessMine)
@@ -340,17 +339,17 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
 {
     if (command == "mine")
     {
-        std::unique_ptr<bz_BasePlayerRecord> playerRecord(bz_getPlayerByIndex(playerID));
+        bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
 
-        if (playerRecord->team != eObservers)
+        if (pr->team != eObservers)
         {
             // Check if the player has the Useless flag
-            if (playerRecord->currentFlag == "USeless (+US)")
+            if (pr->currentFlag == "USeless (+US)")
             {
                 // Store their current position
-                float currentPosition[3] = {playerRecord->lastKnownState.pos[0], playerRecord->lastKnownState.pos[1], playerRecord->lastKnownState.pos[2]};
+                float currentPosition[3] = {pr->lastKnownState.pos[0], pr->lastKnownState.pos[1], pr->lastKnownState.pos[2]};
 
-                setMine(playerID, currentPosition, playerRecord->team);
+                setMine(playerID, currentPosition, pr->team);
             }
             else
             {
@@ -361,6 +360,8 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
         {
             bz_sendTextMessage(BZ_SERVER, playerID, "Silly observer, you can't place a mine.");
         }
+
+        bz_freePlayerRecord(pr);
 
         return true;
     }
@@ -441,6 +442,8 @@ void UselessMine::removeMine(Mine &mine)
 // Remove all of the mines of a specific player
 void UselessMine::removePlayerMines(int playerID)
 {
+    bz_debugMessagef(4, "DEBUG :: Useless Mine :: Removing all mines for player %d", playerID);
+
     activeMines.erase(
         std::remove_if(
             activeMines.begin(),
@@ -454,10 +457,13 @@ void UselessMine::removePlayerMines(int playerID)
 // A shortcut to set a mine
 void UselessMine::setMine(int owner, float pos[3], bz_eTeamType team)
 {
-    // Remove their flag because it's going to be a US flag
+    // Remove their flag because they "converted" it into a mine
     bz_removePlayerFlag(owner);
 
-    // Push the new mine
     Mine newMine(owner, pos, team);
+
+    bz_debugMessagef(4, "DEBUG :: Useless Mine :: Mine UID %s created by %d", newMine.uid.c_str(), owner);
+    bz_debugMessagef(4, "DEBUG :: Useless Mine ::   x, y, z => %0.2f, %0.2f, %0.2f", pos[0], pos[1], pos[2]);
+
     activeMines.push_back(newMine);
 }
