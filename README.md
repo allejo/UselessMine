@@ -30,7 +30,7 @@ This plug-in accepts the path to a [text file](https://github.com/allejo/Useless
 
 | Name | Abbv | Description |
 | ---- | ---- | ----------- |
-| `Bomb Defusal` | `BD` | If carried over a mine's location, the mine will instead detonate at the owner's current location; points will be given to the player carrying the `+BD` flag. |
+| Bomb&nbsp;Defusal | `BD` | If carried over a mine's location, the mine will instead detonate at the owner's current location; points will be given to the player carrying the `+BD` flag. |
 
 ### Custom BZDB Variables
 
