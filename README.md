@@ -26,6 +26,12 @@ This plug-in accepts the path to a [text file](https://github.com/allejo/Useless
 -loadplugin lastTankStanding,/path/to/UselessMine.deathMessages
 ```
 
+### Custom Flags
+
+| Name | Abbv | Description |
+| ---- | ---- | ----------- |
+| `Bomb Defusal` | `BD` | If carried over a mine's location, the mine will instead detonate at the owner's current location; points will be given to the player carrying the `+BD` flag. |
+
 ### Custom BZDB Variables
 
 These custom BZDB variables must be used with `-setforced`, which sets BZDB variable `<name>` to `<value>`, even if the variable does not exist. These variables may changed at any time in-game by using the `/set` command.
