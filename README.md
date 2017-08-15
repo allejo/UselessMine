@@ -1,7 +1,7 @@
 # UselessMine
 
 [![GitHub release](https://img.shields.io/github/release/allejo/UselessMine.svg)](https://github.com/allejo/UselessMine/releases/latest)
-![Minimum BZFlag Version](https://img.shields.io/badge/BZFlag-v2.4.0+-blue.svg)
+![Minimum BZFlag Version](https://img.shields.io/badge/BZFlag-v2.4.4+-blue.svg)
 [![License](https://img.shields.io/github/license/allejo/UselessMine.svg)](https://github.com/allejo/UselessMine/blob/master/LICENSE.md)
 
 A BZFlag plug-in that allows players to convert the Useless flag into mines to kill other players simply by typing '/mine' while carrying a Useless flag.
@@ -10,7 +10,7 @@ The [original plug-in](http://forums.bzflag.org/viewtopic.php?f=79&t=10340&p=103
 
 ## Compiling Requirements
 
-- BZFlag 2.4.0+
+- BZFlag 2.4.4+
 - [bztoolkit](https://github.com/allejo/bztoolkit)
 - C++11
 
