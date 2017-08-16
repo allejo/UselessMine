@@ -27,6 +27,8 @@
 #include "bzfsAPI.h"
 #include "bztoolkit/bzToolkitAPI.h"
 
+const int DEBUG_VERBOSITY = 4;
+
 // Define plugin name
 const std::string PLUGIN_NAME = "Useless Mine";
 
@@ -115,7 +117,7 @@ public:
             {
                 bz_BasePlayerRecord *pr = bz_getPlayerByIndex(owner);
 
-                bz_debugMessagef(4, "DEBUG :: Useless Mine :: Mine UID %s defused", uid.c_str());
+                bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Mine UID %s defused by %d", uid.c_str(), playerID);
 
                 defused = true;
                 defuserID = playerID;
@@ -141,7 +143,7 @@ public:
                 // Only detonate a mine once
                 if (!detonated)
                 {
-                    bz_debugMessagef(4, "DEBUG :: Useless Mine :: Mine UID %s detonated", uid.c_str());
+                    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Mine UID %s detonated", uid.c_str());
 
                     detonated = true;
                     detonationTime = bz_getCurrentTime();
@@ -428,25 +430,32 @@ void UselessMine::removeMine(Mine &mine)
 {
     const char* uid = mine.uid.c_str();
 
-    bz_debugMessagef(4, "DEBUG :: Useless Mine :: Removing mine UID: %s", mine.uid.c_str());
-    bz_debugMessagef(4, "DEBUG :: Useless Mine ::  mine count: %d", getMineCount());
+    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Removing mine UID: %s", mine.uid.c_str());
+    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine ::   mine count: %d", getMineCount());
 
     activeMines.erase(
         std::remove_if(
             activeMines.begin(),
             activeMines.end(),
-            [uid](Mine &m) { return m.uid == uid; }
+            [uid](Mine &m) {
+                bool result = (m.uid == uid);
+
+                if (result)
+                    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Mine %s removed", uid);
+
+                return result;
+            }
         ),
         activeMines.end()
     );
 
-    bz_debugMessagef(4, "DEBUG :: Useless Mine ::  new mine count: %d", getMineCount());
+    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine ::   new mine count: %d", getMineCount());
 }
 
 // Remove all of the mines of a specific player
 void UselessMine::removePlayerMines(int playerID)
 {
-    bz_debugMessagef(4, "DEBUG :: Useless Mine :: Removing all mines for player %d", playerID);
+    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Removing all mines for player %d", playerID);
 
     activeMines.erase(
         std::remove_if(
@@ -466,8 +475,8 @@ void UselessMine::setMine(int owner, float pos[3], bz_eTeamType team)
 
     Mine newMine(owner, pos, team);
 
-    bz_debugMessagef(4, "DEBUG :: Useless Mine :: Mine UID %s created by %d", newMine.uid.c_str(), owner);
-    bz_debugMessagef(4, "DEBUG :: Useless Mine ::   x, y, z => %0.2f, %0.2f, %0.2f", pos[0], pos[1], pos[2]);
+    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Mine UID %s created by %d", newMine.uid.c_str(), owner);
+    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine ::   x, y, z => %0.2f, %0.2f, %0.2f", pos[0], pos[1], pos[2]);
 
     activeMines.push_back(newMine);
 }
