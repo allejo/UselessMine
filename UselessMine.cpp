@@ -407,6 +407,9 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     }
     else if (command == "minestats")
     {
+        bz_sendTextMessagef(BZ_SERVER, playerID, "Player Mines");
+        bz_sendTextMessagef(BZ_SERVER, playerID, "------------");
+
         std::map<std::string, int> mineCount;
 
         for (Mine &mine : activeMines)
