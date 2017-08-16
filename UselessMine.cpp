@@ -21,6 +21,7 @@
 */
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <stdlib.h>
 
@@ -88,7 +89,7 @@ public:
             detonated(false),
             detonationTime(-1)
         {
-            uid.format("%d_%d", owner, bz_getCurrentTime());
+            uid.format("%d_%d_%d", owner, bz_getCurrentTime(), bzfrand());
         }
 
         // Should a given player trigger this mine?
@@ -194,6 +195,8 @@ void UselessMine::Init (const char* commandLine)
     Register(bz_ePlayerUpdateEvent);
 
     bz_registerCustomSlashCommand("mine", this);
+    bz_registerCustomSlashCommand("minecount", this);
+    bz_registerCustomSlashCommand("minestats", this);
     bz_registerCustomSlashCommand("reload", this);
 
     bz_RegisterCustomFlag("BD", "Bomb Defusal", "Safely defuse enemy mines while killing the mine owners", 0, eGoodFlag);
@@ -220,6 +223,8 @@ void UselessMine::Cleanup (void)
     Flush();
 
     bz_removeCustomSlashCommand("mine");
+    bz_removeCustomSlashCommand("minecount");
+    bz_removeCustomSlashCommand("minestats");
     bz_removeCustomSlashCommand("reload");
 }
 
@@ -368,6 +373,37 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
         }
 
         bz_freePlayerRecord(pr);
+
+        return true;
+    }
+    else if (command == "minecount")
+    {
+        bz_sendTextMessagef(BZ_SERVER, playerID, "There are currently %d active mines on the field", getMineCount(false));
+
+        return true;
+    }
+    else if (command == "minestats")
+    {
+        typedef std::multimap< int, std::string, std::greater<int> > multipass;
+
+        std::map<std::string, int> mineCount;
+
+        for (Mine &mine : activeMines)
+        {
+            mineCount[bz_getPlayerCallsign(mine.owner)]++;
+        }
+
+        multipass mineList;
+
+        for (auto i : mineCount)
+        {
+            mineList.insert(multipass::value_type(i.second, i.first));
+        }
+
+        for (auto i : mineList)
+        {
+            bz_sendTextMessagef(BZ_SERVER, playerID, "%-32s %d", i.second.c_str(), i.first);
+        }
 
         return true;
     }
