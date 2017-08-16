@@ -415,7 +415,7 @@ void UselessMine::reloadDeathMessages()
 // Setting `offset` to true will subtract the current detonated/defused mine that's queued for removal
 int UselessMine::getMineCount(bool offset = false)
 {
-    if (offset && activeMines.size() == 0)
+    if (activeMines.size() <= 0)
     {
         return 0;
     }
