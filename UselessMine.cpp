@@ -36,19 +36,6 @@ const int MINOR = 1;
 const int REV = 0;
 const int BUILD = 59;
 
-// A function to replace substrings in a string with another substring
-std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
-{
-    size_t pos = 0;
-
-    while ((pos = subject.find(search, pos)) != std::string::npos)
-    {
-        subject.replace(pos, search.length(), replace);
-        pos += replace.length();
-    }
-
-    return subject;
-}
 
 class UselessMine : public bz_Plugin, public bz_CustomSlashCommandHandler
 {
@@ -389,6 +376,20 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     }
 
     return false;
+}
+
+// A function to replace substrings in a string with another substring
+std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
+{
+    size_t pos = 0;
+
+    while ((pos = subject.find(search, pos)) != std::string::npos)
+    {
+        subject.replace(pos, search.length(), replace);
+        pos += replace.length();
+    }
+
+    return subject;
 }
 
 // A function to format death messages in order to replace placeholders with callsigns and values
