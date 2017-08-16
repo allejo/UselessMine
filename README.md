@@ -49,6 +49,8 @@ These custom BZDB variables must be used with `-setforced`, which sets BZDB vari
 | Command | Permission | Description |
 | ------- | :--------: | ----------- |
 | `/mine` | N/A | Lay a mine |
+| `/minestats` | N/A | Display the number of mines each player has on the field |
+| `/minecount` | N/A | Display the total number of mines on the field |
 | `/reload` | setAll | Reload the death messages |
 | `/reload deathmessages` | setAll | Reload the death messages |
 

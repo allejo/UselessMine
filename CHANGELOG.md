@@ -3,6 +3,8 @@
 **New**
 
 - New "Bomb Defusal" flag allows players to defuse mines
+- New `/minestats` command shows the amount of mines each player has
+- New `/minecount` command shows the total number of mines on the field
 
 **Changes**
 
