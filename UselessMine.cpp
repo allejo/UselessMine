@@ -37,7 +37,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 1;
 const int REV = 0;
-const int BUILD = 59;
+const int BUILD = 63;
 
 // A function to replace substrings in a string with another substring
 std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
@@ -60,13 +60,15 @@ public:
     virtual void Init (const char* config);
     virtual void Event (bz_EventData *eventData);
     virtual void Cleanup (void);
+    virtual bool SlashCommand (int, bz_ApiString, bz_ApiString, bz_APIStringList*);
 
-    virtual bool SlashCommand (int playerID, bz_ApiString, bz_ApiString, bz_APIStringList*);
+    typedef std::multimap< int, std::string, std::greater<int> > rmap;
 
     // The information each mine will contain
     struct Mine
     {
         bz_ApiString uid;      // A unique ID for mine
+        bool queuedRemoval;
 
         int owner;             // The owner of the mine
         int defuserID;         // The player who defused this mine
@@ -87,9 +89,16 @@ public:
             team(_team),
             defused(false),
             detonated(false),
-            detonationTime(-1)
+            detonationTime(-1),
+            queuedRemoval(false)
         {
             uid.format("%d_%d_%d", owner, bz_getCurrentTime(), bzfrand());
+        }
+
+        // Has the mine already been detonated/defused and is ready to be removed?
+        bool isStale()
+        {
+            return (detonationTime != -1 && detonationTime + 60 < bz_getCurrentTime());
         }
 
         // Should a given player trigger this mine?
@@ -114,6 +123,11 @@ public:
 
         bool defuse(int playerID)
         {
+            if (queuedRemoval)
+            {
+                return false;
+            }
+
             if (bztk_isValidPlayerID(owner) && bz_getPlayerTeam(owner) != eObservers)
             {
                 bz_BasePlayerRecord *pr = bz_getPlayerByIndex(owner);
@@ -124,7 +138,9 @@ public:
                 defuserID = playerID;
                 detonationTime = bz_getCurrentTime();
 
-                bz_fireWorldWep("SW", 2.0, BZ_SERVER, pr->lastKnownState.pos, 0, 0, 0, &detonationID, 0, bz_getPlayerTeam(playerID));
+                bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s successfully defused %s's mine!", bz_getPlayerCallsign(defuserID), bz_getPlayerCallsign(owner));
+
+                queuedRemoval = bz_fireWorldWep("SW", 2.0, BZ_SERVER, pr->lastKnownState.pos, 0, 0, 0, &detonationID, 0, bz_getPlayerTeam(playerID));
 
                 bz_freePlayerRecord(pr);
 
@@ -136,6 +152,11 @@ public:
 
         bool detonate()
         {
+            if (queuedRemoval)
+            {
+                return false;
+            }
+
             // Check that the mine owner exists and is not an observer
             if (bztk_isValidPlayerID(owner) && bz_getPlayerTeam(owner) != eObservers)
             {
@@ -149,7 +170,7 @@ public:
                     detonated = true;
                     detonationTime = bz_getCurrentTime();
 
-                    bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, &detonationID, 0, team);
+                    queuedRemoval = bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, &detonationID, 0, team);
 
                     return true;
                 }
@@ -160,7 +181,7 @@ public:
     };
 
 private:
-    int  getMineCount (bool offset);
+    int  getMineCount ();
     void reloadDeathMessages (),
          removePlayerMines (int playerID),
          removeMine (Mine &mine),
@@ -252,6 +273,13 @@ void UselessMine::Event (bz_EventData *eventData)
 
             for (Mine &mine : activeMines)
             {
+                // We delete the mine after it's considered stale. This way, we can correctly allow for multiple players to be killed by the mine
+                if (mine.isStale())
+                {
+                    removeMine(mine);
+                    continue;
+                }
+
                 // This isn't the mine we're looking for since it hasn't been touched
                 if (!mine.detonated && !mine.defused)
                 {
@@ -272,7 +300,6 @@ void UselessMine::Event (bz_EventData *eventData)
                 {
                     dieData->killerID = mine.owner;
 
-
                     if (!deathMessages.empty() && playerID != mine.owner)
                     {
                         // The random number used to fetch a random taunting death message
@@ -286,11 +313,7 @@ void UselessMine::Event (bz_EventData *eventData)
                 else if (mine.defused)
                 {
                     dieData->killerID = mine.defuserID;
-
-                    bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s successfully defused %s's mine! [%d]", bz_getPlayerCallsign(mine.defuserID), owner, getMineCount(true));
                 }
-
-                removeMine(mine);
 
                 break;
             }
@@ -378,26 +401,26 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     }
     else if (command == "minecount")
     {
-        bz_sendTextMessagef(BZ_SERVER, playerID, "There are currently %d active mines on the field", getMineCount(false));
+        bz_sendTextMessagef(BZ_SERVER, playerID, "There are currently %d active mines on the field", getMineCount());
 
         return true;
     }
     else if (command == "minestats")
     {
-        typedef std::multimap< int, std::string, std::greater<int> > multipass;
-
         std::map<std::string, int> mineCount;
 
         for (Mine &mine : activeMines)
         {
+            if (mine.queuedRemoval) { continue; }
+
             mineCount[bz_getPlayerCallsign(mine.owner)]++;
         }
 
-        multipass mineList;
+        rmap mineList;
 
         for (auto i : mineCount)
         {
-            mineList.insert(multipass::value_type(i.second, i.first));
+            mineList.insert(rmap::value_type(i.second, i.first));
         }
 
         for (auto i : mineList)
@@ -433,7 +456,7 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
     // If the message has a %minecount%, then replace it
     if (formattedMessage.find("%minecount%") != std::string::npos)
     {
-        formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(getMineCount(true)));
+        formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(getMineCount()));
     }
 
     return formattedMessage;
@@ -451,14 +474,17 @@ void UselessMine::reloadDeathMessages()
 
 // Get the amount of active mines that exist
 // Setting `offset` to true will subtract the current detonated/defused mine that's queued for removal
-int UselessMine::getMineCount(bool offset = false)
+int UselessMine::getMineCount()
 {
-    if (offset && activeMines.size() == 0)
+    int count = 0;
+
+    for (Mine &m : activeMines)
     {
-        return 0;
+        if (!m.queuedRemoval)
+            count++;
     }
 
-    return (int)activeMines.size() - (offset ? 1 : 0);
+    return count;
 }
 
 // Remove a specific mine
