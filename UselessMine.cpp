@@ -108,7 +108,10 @@ public:
 
             return false;
         }
-
+        
+        // This sets the mine for defusal - the mine will trigger, but
+        // will instead trigger at the location of the owner, with the
+        // killer ID being that of the defuser.
         bool defuse(int playerID)
         {
             if (bztk_isValidPlayerID(owner) && bz_getPlayerTeam(owner) != eObservers)
@@ -130,7 +133,9 @@ public:
 
             return false;
         }
-
+        // This sets the mine for detonation - the mine will trigger,
+        // killing the victim and setting the killer as the mine
+        // owner. 
         bool detonate()
         {
             // Check that the mine owner exists and is not an observer
