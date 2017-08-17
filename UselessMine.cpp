@@ -154,12 +154,14 @@ private:
          removePlayerMines (int playerID),
          removeMine (Mine &mine),
          setMine (int owner, float pos[3], bz_eTeamType team);
-    std::string formatDeathMessage (std::string msg, std::string victim, std::string owner);
+    std::string formatMineMessage (std::string msg, std::string victim, std::string owner);
 
     std::vector<std::string> deathMessages; // A vector that will store all of the witty death messages
+    std::vector<std::string> defusalMessages; // A vector that will store all of the witty defusal messages
+
     std::vector<Mine> activeMines; // A vector that will store all of the mines currently on the field
     std::string deathMessagesFile; // The path to the file containing death messages
-
+    std::string defusalMessagesFile; // The path to the file containing defusal messages
     double playerSpawnTime[256]; // The time a player spawned last; used for _mineSafetyTime calculations
 };
 
@@ -192,8 +194,10 @@ void UselessMine::Init (const char* commandLine)
 
     // Save the location of the file so we can reload after
     deathMessagesFile = commandLine;
-
+    defusalMessagesFile = commandLine;
+    
     reloadDeathMessages();
+    reloadDefusalMessages();
 
     if (deathMessages.empty())
     {
@@ -201,7 +205,17 @@ void UselessMine::Init (const char* commandLine)
     }
     else
     {
-        bz_debugMessagef(2, "DEBUG :: Useless Mine :: %d witty messages were loaded", deathMessages.size());
+        bz_debugMessagef(2, "DEBUG :: Useless Mine :: %d witty death messages were loaded", deathMessages.size());
+    }
+
+
+    if (defusalMessages.empty())
+    {
+        bz_debugMessage(2, "WARNING :: Useless Mine :: No witty defusal messages were loaded");
+    }
+    else
+    {
+        bz_debugMessagef(2, "DEBUG :: Useless Mine :: %d witty defusal messages were loaded", defusalMessages.size());
     }
 }
 
@@ -265,14 +279,21 @@ void UselessMine::Event (bz_EventData *eventData)
 
                         // Get a random death message
                         std::string deathMessage = deathMessages.at(randomNumber);
-                        bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
+                        bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, victim, owner).c_str());
                     }
                 }
                 else if (mine.defused)
                 {
                     dieData->killerID = mine.defuserID;
+                    if (!defusalMessages.empty() && playerID != mine.owner)
+                    {
+                        // The random number used to fetch a random taunting defusal message
+                        int randomNumber = rand() % defusalMessages.size();
 
-                    bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s successfully defused %s's mine! [%d]", bz_getPlayerCallsign(mine.defuserID), owner, getMineCount(true));
+                        // Get a random defusal message
+                        std::string defusalMessage = defusalMessages.at(randomNumber);
+                        bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDefusalMessage(defusalMessage, bz_getPlayerCallsign(mine.defuserID), owner).c_str());
+                    }
                 }
 
                 removeMine(mine);
@@ -369,9 +390,17 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
             bz_sendTextMessage(BZ_SERVER, playerID, "Death messages reloaded");
             return true;
         }
-        else if (params->size() == 0)
+        if (params->get(1) == "defusalmessages")
         {
             reloadDeathMessages();
+            bz_sendTextMessage(BZ_SERVER, playerID, "Defusal messages reloaded");
+            return true;
+        }
+        
+        if (params->size() == 0)
+        {
+            reloadDeathMessages();
+            reloadDefusalMessages();
         }
     }
 
@@ -393,7 +422,7 @@ std::string ReplaceString(std::string subject, const std::string& search, const 
 }
 
 // A function to format death messages in order to replace placeholders with callsigns and values
-std::string UselessMine::formatDeathMessage(std::string msg, std::string victim, std::string owner)
+std::string UselessMine::formatMineMessage(std::string msg, std::string victim, std::string owner)
 {
     // Replace the %victim% and %owner% placeholders
     std::string formattedMessage = ReplaceString(ReplaceString(msg, "%victim%", victim), "%owner%", owner);
@@ -407,6 +436,7 @@ std::string UselessMine::formatDeathMessage(std::string msg, std::string victim,
     return formattedMessage;
 }
 
+//reload the death messages
 void UselessMine::reloadDeathMessages()
 {
     deathMessages.clear();
@@ -414,6 +444,17 @@ void UselessMine::reloadDeathMessages()
     if (!deathMessagesFile.empty())
     {
         bztk_fileToVector(deathMessagesFile.c_str(), deathMessages);
+    }
+}
+
+//reload the defusal messages
+void UselessMine::reloadDefusalMessages()
+{
+    defusalMessages.clear();
+
+    if (!defusalMessagesFile.empty())
+    {
+        bztk_fileToVector(defusalMessagesFile.c_str(), defusalMessages);
     }
 }
 
