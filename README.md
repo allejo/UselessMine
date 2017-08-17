@@ -23,7 +23,7 @@ This plug-in follows [my standard instructions for compiling plug-ins](https://g
 This plug-in accepts the path to a [text file](https://github.com/allejo/UselessMine/blob/master/UselessMine.deathMessages) containing death messages when loaded. If a text file is not given when loaded, no death messages will be announced when mines are exploded.
 
 ```
--loadplugin lastTankStanding,/path/to/UselessMine.deathMessages
+-loadplugin UselessMine,/path/to/UselessMine.deathMessages
 ```
 
 ### Custom Flags
