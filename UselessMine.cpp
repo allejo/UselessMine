@@ -176,6 +176,7 @@ public:
 private:
     int  getMineCount ();
     void reloadDeathMessages (),
+         reloadDefusalMessages (),
          removePlayerMines (int playerID),
          removeMine (Mine &mine),
          setMine (int owner, float pos[3], bz_eTeamType team);
@@ -220,8 +221,23 @@ void UselessMine::Init (const char* commandLine)
     bztk_registerCustomDoubleBZDB("_mineSafetyTime", 5.0);
 
     // Save the location of the file so we can reload after
-    deathMessagesFile = commandLine;
-    defusalMessagesFile = commandLine;
+    
+    // This expects two command line parameters: the death messages
+    // file and the defusal messages file. 
+    bz_APIStringList cmdLineParams;
+    cmdLineParams.tokenize(commandLine, ",");
+    
+    if (cmdLineParams.size() == 2)
+    {
+        deathMessagesFile = cmdLineParams.get(0);
+        defusalMessagesFile = cmdLineParams.get(1);
+    }
+    else
+    {
+        deathMessagesFile = "";
+        defusalMessagesFile = "";
+        bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Could not load messages.");
+    }
     
     reloadDeathMessages();
     reloadDefusalMessages();
@@ -234,7 +250,6 @@ void UselessMine::Init (const char* commandLine)
     {
         bz_debugMessagef(2, "DEBUG :: Useless Mine :: %d witty death messages were loaded", deathMessages.size());
     }
-
 
     if (defusalMessages.empty())
     {
@@ -317,7 +332,7 @@ void UselessMine::Event (bz_EventData *eventData)
                             int randomNumber = rand() % deathMessages.size();
                             std::string deathMessage = deathMessages.at(randomNumber);
 
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDeathMessage(deathMessage, victim, owner).c_str());
+                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, victim, owner).c_str());
                         }
                         else
                         {
@@ -329,6 +344,7 @@ void UselessMine::Event (bz_EventData *eventData)
                 else if (mine.defused)
                 {
                     dieData->killerID = mine.defuserID;
+
                     if (playerID != mine.owner)
                     {
                         if (!defusalMessages.empty())
@@ -338,15 +354,15 @@ void UselessMine::Event (bz_EventData *eventData)
 
                             // Get a random defusal message
                             std::string defusalMessage = defusalMessages.at(randomNumber);
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatDefusalMessage(defusalMessage, bz_getPlayerCallsign(mine.defuserID), owner).c_str());
+                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, bz_getPlayerCallsign(mine.defuserID), owner).c_str());
                         }
                         else
                         {
-                            //let the BD player know that they killed the owner
-                            bz_sendTextMessagef(BZ_SERVER, playerID, "You defused %s's mine", owner);
+                            // Let the BD player know that they killed the owner
+                            bz_sendTextMessagef(BZ_SERVER, victim, "You defused %s's mine", owner);
 
-                            //let the owner know that they killed the BD player
-                            bz_sendTextMessagef(BZ_SERVER, owner, "You were killed by %s's mine defusal", playerID);
+                            // Let the owner know that they killed the BD player
+                            bz_sendTextMessagef(BZ_SERVER, owner, "You were killed by %s's mine defusal", victim);
                             
                         }
                     }
@@ -476,23 +492,27 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     }
     else if (command == "reload" && bz_hasPerm(playerID, "setAll"))
     {
-        if (params->get(0) == "deathmessages")
-        {
-            reloadDeathMessages();
-            bz_sendTextMessage(BZ_SERVER, playerID, "Death messages reloaded");
-            return true;
-        }
-        if (params->get(1) == "defusalmessages")
-        {
-            reloadDeathMessages();
-            bz_sendTextMessage(BZ_SERVER, playerID, "Defusal messages reloaded");
-            return true;
-        }
-        
         if (params->size() == 0)
         {
             reloadDeathMessages();
             reloadDefusalMessages();
+        }
+
+        else
+        {
+            if (params->get(0) == "deathmessages")
+            {
+                reloadDeathMessages();
+                bz_sendTextMessage(BZ_SERVER, playerID, "Death messages reloaded");
+                return true;
+            }
+
+            if (params->get(1) == "defusalmessages")
+            {
+                reloadDeathMessages();
+                bz_sendTextMessage(BZ_SERVER, playerID, "Defusal messages reloaded");
+                return true;
+            }
         }
     }
 
@@ -528,7 +548,7 @@ std::string UselessMine::formatMineMessage(std::string msg, std::string victim, 
     return formattedMessage;
 }
 
-//reload the death messages
+// Reload the death messages
 void UselessMine::reloadDeathMessages()
 {
     deathMessages.clear();
@@ -539,7 +559,7 @@ void UselessMine::reloadDeathMessages()
     }
 }
 
-//reload the defusal messages
+// Reload the defusal messages
 void UselessMine::reloadDefusalMessages()
 {
     defusalMessages.clear();
