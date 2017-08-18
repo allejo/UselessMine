@@ -23,13 +23,13 @@ This plug-in follows [my standard instructions for compiling plug-ins](https://g
 This plug-in accepts the path to a [text file](https://github.com/allejo/UselessMine/blob/master/UselessMine.deathMessages) containing death messages when loaded. If a text file is not given when loaded, no death messages will be announced when mines are exploded.
 
 ```
--loadplugin UselessMine,/path/to/UselessMine.deathMessages
+-loadplugin UselessMine.so,UselessMine.deathMessages,UselessMine.defuseMessages
 ```
 
 ### Custom Flags
 
-| Name | Abbv | Description |
-| ---- | :--: | ----------- |
+| Name              | Abbv | Description                              |
+| ----------------- | :--: | ---------------------------------------- |
 | Bomb&nbsp;Defusal | `BD` | If carried over a mine's location, the mine will instead detonate at the owner's current location; points will be given to the player carrying the `+BD` flag. |
 
 ### Custom BZDB Variables
@@ -40,19 +40,19 @@ These custom BZDB variables must be used with `-setforced`, which sets BZDB vari
 -setforced <name> <value>
 ```
 
-| Name | Type | Default | Description |
-| ---- | :--: | :-----: | ----------- |
-| `_mineSafetyTime` | int | 5 | The number of seconds a player has to leave the mine detonation radius if they accidentally spawn in it. |
+| Name              | Type | Default | Description                              |
+| ----------------- | :--: | :-----: | ---------------------------------------- |
+| `_mineSafetyTime` | int  |    5    | The number of seconds a player has to leave the mine detonation radius if they accidentally spawn in it. |
 
 ### Custom Slash Commands
 
-| Command | Permission | Description |
-| ------- | :--------: | ----------- |
-| `/mine` | N/A | Lay a mine |
-| `/minestats` | N/A | Display the number of mines each player has on the field |
-| `/minecount` | N/A | Display the total number of mines on the field |
-| `/reload` | setAll | Reload the death messages |
-| `/reload deathmessages` | setAll | Reload the death messages |
+| Command                 | Permission | Description                              |
+| ----------------------- | :--------: | ---------------------------------------- |
+| `/mine`                 |    N/A     | Lay a mine                               |
+| `/minestats`            |    N/A     | Display the number of mines each player has on the field |
+| `/minecount`            |    N/A     | Display the total number of mines on the field |
+| `/reload`               |   setAll   | Reload the death messages                |
+| `/reload deathmessages` |   setAll   | Reload the death messages                |
 
 ### Custom Death Messages file
 
