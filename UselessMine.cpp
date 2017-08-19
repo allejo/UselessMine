@@ -236,7 +236,7 @@ void UselessMine::Init (const char* commandLine)
     {
         deathMessagesFile = "";
         defusalMessagesFile = "";
-        bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Could not load messages.");
+        bz_debugMessagef(DEBUG_VERBOSITY, "WARNING :: Useless Mine :: No messages loaded");
     }
     
     reloadDeathMessages();
