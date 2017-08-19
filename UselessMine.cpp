@@ -498,21 +498,18 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
             reloadDefusalMessages();
         }
 
-        else
+        else if (params->get(0) == "deathmessages")
         {
-            if (params->get(0) == "deathmessages")
-            {
-                reloadDeathMessages();
-                bz_sendTextMessage(BZ_SERVER, playerID, "Death messages reloaded");
-                return true;
-            }
+            reloadDeathMessages();
+            bz_sendTextMessage(BZ_SERVER, playerID, "Death messages reloaded");
+            return true;
+        }
 
-            if (params->get(1) == "defusalmessages")
-            {
-                reloadDeathMessages();
-                bz_sendTextMessage(BZ_SERVER, playerID, "Defusal messages reloaded");
-                return true;
-            }
+        else if (params->get(0) == "defusalmessages")
+        {
+            reloadDefusalMessages();
+            bz_sendTextMessage(BZ_SERVER, playerID, "Defusal messages reloaded");
+            return true;
         }
     }
 
