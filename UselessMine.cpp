@@ -359,10 +359,10 @@ void UselessMine::Event (bz_EventData *eventData)
                         else
                         {
                             // Let the BD player know that they killed the owner
-                            bz_sendTextMessagef(BZ_SERVER, dieData->killerID, "You defused %s's mine", owner);
+                            bz_sendTextMessagef(BZ_SERVER, mine.defuserID, "You defused %s's mine", owner);
 
                             // Let the owner know that they killed the BD player
-                            bz_sendTextMessagef(BZ_SERVER, playerID, "You were killed by %s's mine defusal", victim);
+                            bz_sendTextMessagef(BZ_SERVER, mine.owner, "You were killed by %s's mine defusal", bz_getPlayerCallsign(mine.defuserID));
                             
                         }
                     }
