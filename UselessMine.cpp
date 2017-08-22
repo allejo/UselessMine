@@ -354,7 +354,7 @@ void UselessMine::Event (bz_EventData *eventData)
 
                             // Get a random defusal message
                             std::string defusalMessage = defusalMessages.at(randomNumber);
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, bz_getPlayerCallsign(mine.defuserID), owner).c_str());
+                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, owner, bz_getPlayerCallsign(mine.defuserID)).c_str());
                         }
                         else
                         {
