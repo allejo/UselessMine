@@ -37,7 +37,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 1;
 const int REV = 0;
-const int BUILD = 63;
+const int BUILD = 81;
 
 
 class UselessMine : public bz_Plugin, public bz_CustomSlashCommandHandler
