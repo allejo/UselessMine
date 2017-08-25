@@ -342,36 +342,47 @@ void UselessMine::Event (bz_EventData *eventData)
                     }
                     else
                     {
-                        //if the owner was killed with their own mine, send a message
+                        // If the owner was killed with their own mine, send a message
                         bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was owned by their own mine!", owner);
                     }
                 }
                 else if (mine.defused)
                 {
                     // Make sure the killer was the server, and the victim was the owner.
-                    if (dieData->killerID == 253 && playerID == mine.owner)
+                    if (dieData->killerID == 253)
                     {
                         // Since the killer was the server, it was the defusal that killed the player. Thus,
                         // give credit where credit is due.
                         dieData->killerID = mine.defuserID;
 
-                        if (!defusalMessages.empty())
+                        // Take note of the defuser's callsign
+                        const char* defuser = bz_getPlayerCallsign(mine.defuserID);
+                        
+                        if (playerID == mine.owner)
                         {
-                            // The random number used to fetch a random taunting defusal message
-                            int randomNumber = rand() % defusalMessages.size();
+                            
+                            if (!defusalMessages.empty())
+                            {
+                                // The random number used to fetch a random taunting defusal message
+                                int randomNumber = rand() % defusalMessages.size();
 
-                            // Get a random defusal message
-                            std::string defusalMessage = defusalMessages.at(randomNumber);
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, owner, bz_getPlayerCallsign(mine.defuserID)).c_str());
+                                // Get a random defusal message
+                                std::string defusalMessage = defusalMessages.at(randomNumber);
+                                bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, owner, defuser).c_str());
+                            }
+                            else
+                            {
+                                // Let the BD player know that they killed the owner
+                                bz_sendTextMessagef(BZ_SERVER, mine.defuserID, "You defused %s's mine", owner);
+
+                                // Let the owner know that they were killed by the BD player
+                                bz_sendTextMessagef(BZ_SERVER, mine.owner, "You were killed by %s's mine defusal", defuser);
+                            }
                         }
                         else
                         {
-                            // Let the BD player know that they killed the owner
-                            bz_sendTextMessagef(BZ_SERVER, mine.defuserID, "You defused %s's mine", owner);
-
-                            // Let the owner know that they were killed by the BD player
-                            bz_sendTextMessagef(BZ_SERVER, mine.owner, "You were killed by %s's mine defusal", bz_getPlayerCallsign(mine.defuserID));
-                            
+                            // If the victim wasn't the owner, then send a different message
+                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was killed by %s's mine defusal.", victim, defuser);
                         }
                     }
                 }
