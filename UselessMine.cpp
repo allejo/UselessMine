@@ -340,6 +340,11 @@ void UselessMine::Event (bz_EventData *eventData)
                             bz_sendTextMessagef(BZ_SERVER, playerID, "You were killed by %s's mine", owner);
                         }
                     }
+                    else
+                    {
+                        //if the owner was killed with their own mine, send a message
+                        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was owned by their own mine!", owner);
+                    }
                 }
                 else if (mine.defused)
                 {
