@@ -343,10 +343,13 @@ void UselessMine::Event (bz_EventData *eventData)
                 }
                 else if (mine.defused)
                 {
-                    dieData->killerID = mine.defuserID;
-
-                    if (playerID != mine.owner)
+                    // Make sure the killer was the server, and the victim was the owner.
+                    if (dieData->killerID == 253 && playerID == mine.owner)
                     {
+                        // Since the killer was the server, it was the defusal that killed the player. Thus,
+                        // give credit where credit is due.
+                        dieData->killerID = mine.defuserID;
+
                         if (!defusalMessages.empty())
                         {
                             // The random number used to fetch a random taunting defusal message
@@ -361,7 +364,7 @@ void UselessMine::Event (bz_EventData *eventData)
                             // Let the BD player know that they killed the owner
                             bz_sendTextMessagef(BZ_SERVER, mine.defuserID, "You defused %s's mine", owner);
 
-                            // Let the owner know that they killed the BD player
+                            // Let the owner know that they were killed by the BD player
                             bz_sendTextMessagef(BZ_SERVER, mine.owner, "You were killed by %s's mine defusal", bz_getPlayerCallsign(mine.defuserID));
                             
                         }
