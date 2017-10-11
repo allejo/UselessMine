@@ -107,7 +107,7 @@ public:
 
             return false;
         }
-        
+
         // This sets the mine for defusal - the mine will trigger, but
         // will instead trigger at the location of the owner, with the
         // killer ID being that of the defuser.
@@ -142,7 +142,7 @@ public:
         }
         // This sets the mine for detonation - the mine will trigger,
         // killing the victim and setting the killer as the mine
-        // owner. 
+        // owner.
         bool detonate()
         {
             if (queuedRemoval)
@@ -221,12 +221,12 @@ void UselessMine::Init (const char* commandLine)
     bztk_registerCustomDoubleBZDB("_mineSafetyTime", 5.0);
 
     // Save the location of the file so we can reload after
-    
+
     // This expects two command line parameters: the death messages
-    // file and the defusal messages file. 
+    // file and the defusal messages file.
     bz_APIStringList cmdLineParams;
     cmdLineParams.tokenize(commandLine, ",");
-    
+
     if (cmdLineParams.size() == 2)
     {
         deathMessagesFile = cmdLineParams.get(0);
@@ -238,7 +238,7 @@ void UselessMine::Init (const char* commandLine)
         defusalMessagesFile = "";
         bz_debugMessagef(DEBUG_VERBOSITY, "WARNING :: Useless Mine :: No messages loaded");
     }
-    
+
     reloadDeathMessages();
     reloadDefusalMessages();
 
@@ -357,10 +357,10 @@ void UselessMine::Event (bz_EventData *eventData)
 
                         // Take note of the defuser's callsign
                         const char* defuser = bz_getPlayerCallsign(mine.defuserID);
-                        
+
                         if (playerID == mine.owner)
                         {
-                            
+
                             if (!defusalMessages.empty())
                             {
                                 // The random number used to fetch a random taunting defusal message
