@@ -420,16 +420,27 @@ void UselessMine::Event (bz_EventData *eventData)
             bz_PlayerUpdateEventData_V1* updateData = (bz_PlayerUpdateEventData_V1*)eventData;
 
             int playerID = updateData->playerID;
+            bool bypassSafetyTime = (playerSpawnTime[playerID] + bz_getBZDBDouble("_mineSafetyTime") <= bz_getCurrentTime());
             bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
+
+            bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: player #%d at {%0.2f, %0.2f, %0.2f}",
+                             playerID, updateData->state.pos[0], updateData->state.pos[1], updateData->state.pos[2]);
 
             for (Mine &mine : activeMines)
             {
-                bool bypassSafetyTime = (playerSpawnTime[pr->playerID] + bz_getBZDBDouble("_mineSafetyTime") <= bz_getCurrentTime());
-
                 if (mine.canPlayerTriggerMine(pr, updateData->state.pos) && bypassSafetyTime)
                 {
-                    (pr->currentFlag == "Bomb Defusal (+BD)") ? mine.defuse(playerID) : mine.detonate();
-                    break;
+                    bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: player %d located inside mine %s trigger",
+                                     playerID, mine.uid.c_str());
+
+                    bool mineWentBoom = (pr->currentFlag == "Bomb Defusal (+BD)") ? mine.defuse(playerID) : mine.detonate();
+
+                    // Only break if we successfully triggered a mine; otherwise we're just in the same area as a stale
+                    // mine so move on to check the next mine
+                    if (mineWentBoom)
+                    {
+                        break;
+                    }
                 }
             }
 
