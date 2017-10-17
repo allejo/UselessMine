@@ -37,7 +37,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 1;
 const int REV = 0;
-const int BUILD = 81;
+const int BUILD = 84;
 
 
 class UselessMine : public bz_Plugin, public bz_CustomSlashCommandHandler
@@ -180,7 +180,7 @@ private:
          removePlayerMines (int playerID),
          removeMine (Mine &mine),
          setMine (int owner, float pos[3], bz_eTeamType team);
-    std::string formatMineMessage (std::string msg, std::string victim, std::string owner);
+    std::string formatMineMessage (std::string msg, std::string mineOwner, std::string defuserOrVictim);
 
     std::vector<std::string> deathMessages; // A vector that will store all of the witty death messages
     std::vector<std::string> defusalMessages; // A vector that will store all of the witty defusal messages
@@ -291,7 +291,7 @@ void UselessMine::Event (bz_EventData *eventData)
         {
             bz_PlayerDieEventData_V1* dieData = (bz_PlayerDieEventData_V1*)eventData;
 
-            int playerID = dieData->playerID;
+            int victimID = dieData->playerID;
 
             for (Mine &mine : activeMines)
             {
@@ -317,14 +317,14 @@ void UselessMine::Event (bz_EventData *eventData)
 
                 // This is the mine that killed our player, so handle it
 
-                const char* owner  = bz_getPlayerCallsign(mine.owner);
-                const char* victim = bz_getPlayerCallsign(playerID);
+                const char* mineOwner = bz_getPlayerCallsign(mine.owner);
+                const char* explosionVictim = bz_getPlayerCallsign(victimID);
 
                 if (mine.detonated)
                 {
                     dieData->killerID = mine.owner;
 
-                    if (playerID != mine.owner)
+                    if (victimID != mine.owner)
                     {
                         if (!deathMessages.empty())
                         {
@@ -332,18 +332,18 @@ void UselessMine::Event (bz_EventData *eventData)
                             int randomNumber = rand() % deathMessages.size();
                             std::string deathMessage = deathMessages.at(randomNumber);
 
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, victim, owner).c_str());
+                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, mineOwner, explosionVictim).c_str());
                         }
                         else
                         {
                             // If there are no death messages, explain to the user that it was a mine that killed them
-                            bz_sendTextMessagef(BZ_SERVER, playerID, "You were killed by %s's mine", owner);
+                            bz_sendTextMessagef(BZ_SERVER, victimID, "You were killed by %s's mine", mineOwner);
                         }
                     }
                     else
                     {
                         // If the owner was killed with their own mine, send a message
-                        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was owned by their own mine!", owner);
+                        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was owned by their own mine!", mineOwner);
                     }
                 }
                 else if (mine.defused)
@@ -356,11 +356,10 @@ void UselessMine::Event (bz_EventData *eventData)
                         dieData->killerID = mine.defuserID;
 
                         // Take note of the defuser's callsign
-                        const char* defuser = bz_getPlayerCallsign(mine.defuserID);
+                        const char* mineDefuser = bz_getPlayerCallsign(mine.defuserID);
 
-                        if (playerID == mine.owner)
+                        if (victimID == mine.owner)
                         {
-
                             if (!defusalMessages.empty())
                             {
                                 // The random number used to fetch a random taunting defusal message
@@ -368,21 +367,21 @@ void UselessMine::Event (bz_EventData *eventData)
 
                                 // Get a random defusal message
                                 std::string defusalMessage = defusalMessages.at(randomNumber);
-                                bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, owner, defuser).c_str());
+                                bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, mineOwner, mineDefuser).c_str());
                             }
                             else
                             {
                                 // Let the BD player know that they killed the owner
-                                bz_sendTextMessagef(BZ_SERVER, mine.defuserID, "You defused %s's mine", owner);
+                                bz_sendTextMessagef(BZ_SERVER, mine.defuserID, "You defused %s's mine", mineOwner);
 
                                 // Let the owner know that they were killed by the BD player
-                                bz_sendTextMessagef(BZ_SERVER, mine.owner, "You were killed by %s's mine defusal", defuser);
+                                bz_sendTextMessagef(BZ_SERVER, mine.owner, "You were killed by %s's mine defusal", mineDefuser);
                             }
                         }
                         else
                         {
                             // If the victim wasn't the owner, then send a different message
-                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was killed by %s's mine defusal.", victim, defuser);
+                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was killed by %s's mine defusal.", explosionVictim, mineDefuser);
                         }
                     }
                 }
@@ -546,31 +545,14 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
     return false;
 }
 
-// A function to replace substrings in a string with another substring
-std::string ReplaceString(std::string subject, const std::string& search, const std::string& replace)
-{
-    size_t pos = 0;
-
-    while ((pos = subject.find(search, pos)) != std::string::npos)
-    {
-        subject.replace(pos, search.length(), replace);
-        pos += replace.length();
-    }
-
-    return subject;
-}
-
 // A function to format death messages in order to replace placeholders with callsigns and values
-std::string UselessMine::formatMineMessage(std::string msg, std::string victim, std::string owner)
+std::string UselessMine::formatMineMessage(std::string msg, std::string mineOwner, std::string defuserOrVictim)
 {
-    // Replace the %victim% and %owner% placeholders
-    std::string formattedMessage = ReplaceString(ReplaceString(msg, "%victim%", victim), "%owner%", owner);
-
-    // If the message has a %minecount%, then replace it
-    if (formattedMessage.find("%minecount%") != std::string::npos)
-    {
-        formattedMessage = ReplaceString(formattedMessage, "%minecount%", std::to_string(getMineCount()));
-    }
+    bz_ApiString formattedMessage = msg;
+    formattedMessage.replaceAll("%owner%", mineOwner.c_str());
+    formattedMessage.replaceAll("%victim%", defuserOrVictim.c_str());
+    formattedMessage.replaceAll("%defuser", defuserOrVictim.c_str());
+    formattedMessage.replaceAll("%minecount%", std::to_string(getMineCount()).c_str());
 
     return formattedMessage;
 }

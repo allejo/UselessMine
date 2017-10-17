@@ -1,4 +1,4 @@
-%victim% successfully defused %owner%'s mine! [%minecount%]
-%victim% found %owner%'s lost mine, and gave it back. How nice! [%minecount%]
-%owner% just got a taste of their own medicine, courtesy of %victim%. [%minecount%]
-%owner% was just owned by their own mine, thanks to %victim%. [%minecount%]
+%defuser% successfully defused %owner%'s mine! [%minecount%]
+%defuser% found %owner%'s lost mine, and gave it back. How nice! [%minecount%]
+%owner% just got a taste of their own medicine, courtesy of %defuser%. [%minecount%]
+%owner% was just owned by their own mine, thanks to %defuser%. [%minecount%]
