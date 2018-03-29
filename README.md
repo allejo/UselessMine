@@ -1,8 +1,8 @@
 # UselessMine
 
 [![GitHub release](https://img.shields.io/github/release/allejo/UselessMine.svg)](https://github.com/allejo/UselessMine/releases/latest)
-![Minimum BZFlag Version](https://img.shields.io/badge/BZFlag-v2.4.4+-blue.svg)
-[![License](https://img.shields.io/github/license/allejo/UselessMine.svg)](https://github.com/allejo/UselessMine/blob/master/LICENSE.md)
+![Minimum BZFlag Version](https://img.shields.io/badge/BZFlag-v2.4.14+-blue.svg)
+[![License](https://img.shields.io/github/license/allejo/UselessMine.svg)](/LICENSE.md)
 
 A BZFlag plug-in that allows players to convert the Useless flag into mines to kill other players simply by typing '/mine' while carrying a Useless flag.
 
@@ -10,8 +10,7 @@ The [original plug-in](http://forums.bzflag.org/viewtopic.php?f=79&t=10340&p=103
 
 ## Compiling Requirements
 
-- BZFlag 2.4.4+
-- [bztoolkit](https://github.com/allejo/bztoolkit)
+- BZFlag 2.4.14+
 - C++11
 
 This plug-in follows [my standard instructions for compiling plug-ins](https://github.com/allejo/docs.allejo.io/wiki/BZFlag-Plug-in-Distribution).
@@ -20,10 +19,12 @@ This plug-in follows [my standard instructions for compiling plug-ins](https://g
 
 ### Loading the plug-in
 
-This plug-in accepts the path to a [text file](https://github.com/allejo/UselessMine/blob/master/UselessMine.deathMessages) containing death messages when loaded. If a text file is not given when loaded, no death messages will be announced when mines are exploded.
+This plug-in accepts the path to two text files containing [death](/UselessMine.deathMessages) and [defusal](/UselessMine.defuseMessages) messages, respectively, when loaded.
+
+Order matters when you're loading the plug-in, it must be death messages before defuse messages. If you'd like to skip death messages and only have defuseMessages, you may use the keyword `NULL` in place of a death messages file.
 
 ```
--loadplugin UselessMine.so,UselessMine.deathMessages,UselessMine.defuseMessages
+-loadplugin UselessMine.so[,UselessMine.deathMessages][,UselessMine.defuseMessages]
 ```
 
 ### Custom Flags
@@ -55,18 +56,19 @@ These custom BZDB variables must be used with `-setforced`, which sets BZDB vari
 | `/reload deathmessages`   |   setAll   | Reload the death messages                |
 | `/reload defusalmessages` |   setAll   | Reload the defusal messages              |
 
-### Custom Death Messages file
+### Custom Death/Defusal Messages file
 
-This is an optional file that will store all of the witty death messages announced when a player detonates a mine. If you would like death messages to be announced, you must give the plug-in the file.
+These are optional files that will store all of the witty death/defusal messages announced when a player detonates or defuses a mine. If you would like death/defusal messages to be announced, you must give the plug-in the file.
 
-In the file, each line is a separate death message. The supported placeholders are the following:
+In the file, each line is a separate death or defusal message. The supported placeholders are the following:
 
-- `%victim%` - The player who got killed by the mine
+- `%victim%` - The player who got killed by the mine; only available in death messages
 - `%owner%` - The player who placed the mine originally
+- `%defuser%` - The player who defused the mine; only available in defusal messages
 - `%minecount%` - The remaining amount of mines left on the field
 
-The order in which you use the placeholders doesn't matter and the placeholders can be used several times in the same death message. Both `%victim%` and `%owner%` are required for each death message; `%minecount%` is optional.
+The order in which you use the placeholders doesn't matter and the placeholders can be used several times in the same death message.
 
 ## License
 
-[MIT](https://github.com/allejo/UselessMine/blob/master/LICENSE.md)
+[MIT](/LICENSE.md)
