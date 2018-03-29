@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2013-2017 Vladimir "allejo" Jimenez
+    Copyright (C) 2013-2018 Vladimir "allejo" Jimenez
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -35,7 +35,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 
 // Define plugin version numbering
 const int MAJOR = 1;
-const int MINOR = 1;
+const int MINOR = 2;
 const int REV = 0;
 const int BUILD = 84;
 
@@ -198,7 +198,9 @@ const char* UselessMine::Name (void)
     static std::string pluginName;
 
     if (pluginName.empty())
-        pluginName = bztk_pluginName(PLUGIN_NAME, MAJOR, MINOR, REV, BUILD);
+    {
+        pluginName = bz_format("%s %d.%d.%d (%d)", PLUGIN_NAME.c_str(), MAJOR, MINOR, REV, BUILD);
+    }
 
     return pluginName.c_str();
 }
