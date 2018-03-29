@@ -217,10 +217,10 @@ void UselessMine::Init (const char* commandLine)
 
     if (!bz_BZDBItemExists("_mineSafetyTime"))
     {
-        bz_setBZDBDouble("_mineSafetyTime", 5.0);
+        bz_setBZDBInt("_mineSafetyTime", 5);
     }
 
-    bz_setDefaultBZDBDouble("_mineSafetyTime", 5.0);
+    bz_setDefaultBZDBInt("_mineSafetyTime", 5);
 
     // Save the location of the file so we can reload after
 
@@ -350,7 +350,7 @@ void UselessMine::Event (bz_EventData *eventData)
             bz_PlayerUpdateEventData_V1* updateData = (bz_PlayerUpdateEventData_V1*)eventData;
 
             int playerID = updateData->playerID;
-            bool bypassSafetyTime = (playerSpawnTime[playerID] + bz_getBZDBDouble("_mineSafetyTime") <= bz_getCurrentTime());
+            bool bypassSafetyTime = (playerSpawnTime[playerID] + bz_getBZDBInt("_mineSafetyTime") <= bz_getCurrentTime());
             bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
 
             bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: player #%d at {%0.2f, %0.2f, %0.2f}",
