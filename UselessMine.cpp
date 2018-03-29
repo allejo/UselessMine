@@ -26,7 +26,7 @@
 #include <stdlib.h>
 
 #include "bzfsAPI.h"
-#include "bztoolkit/bzToolkitAPI.h"
+#include "plugin_files.h"
 
 const int DEBUG_VERBOSITY = 4;
 
@@ -55,37 +55,31 @@ public:
     struct Mine
     {
         bz_ApiString uid;      // A unique ID for mine
-        bool queuedRemoval;
 
         int owner;             // The owner of the mine
         int defuserID;         // The player who defused this mine
-        int detonationID;      // The shot ID of the world weapon that exploded when this mine was defused/detonated
+        uint32_t detonationShotID; // The GUID of the server shot, whether it's
         float x, y, z;         // The coordinates of where the mine was placed
         bz_eTeamType team;     // The team of the mine owner
         bool defused;          // True if the mine was defused with a Bomb Defusal flag
         bool detonated;        // True if the mine was detonated by a player
-        double detonationTime; // The time the mine was detonated
 
         Mine (int _owner, float _pos[3], bz_eTeamType _team) :
             owner(_owner),
             defuserID(-1),
-            detonationID(-1),
             x(_pos[0]),
             y(_pos[1]),
             z(_pos[2]),
             team(_team),
             defused(false),
-            detonated(false),
-            detonationTime(-1),
-            queuedRemoval(false)
+            detonated(false)
         {
             uid.format("%d_%d_%d", owner, bz_getCurrentTime(), bzfrand());
         }
 
-        // Has the mine already been detonated/defused and is ready to be removed?
         bool isStale()
         {
-            return (detonationTime != -1 && detonationTime + 60 < bz_getCurrentTime());
+            return (defused || detonated);
         }
 
         // Should a given player trigger this mine?
@@ -113,7 +107,7 @@ public:
         // killer ID being that of the defuser.
         bool defuse(int playerID)
         {
-            if (queuedRemoval)
+            if (defused || detonated)
             {
                 return false;
             }
@@ -130,44 +124,42 @@ public:
 
             defused = true;
             defuserID = playerID;
-            detonationTime = bz_getCurrentTime();
 
             bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s successfully defused %s's mine!", bz_getPlayerCallsign(defuserID), bz_getPlayerCallsign(owner));
 
-            queuedRemoval = bz_fireWorldWep("SW", 2.0, BZ_SERVER, pr->lastKnownState.pos, 0, 0, 0, &detonationID, 0, bz_getPlayerTeam(defuserID));
+            float vector[3] = {0, 0, 0};
+            detonationShotID = bz_fireServerShot("SW", pr->lastKnownState.pos, vector, bz_getPlayerTeam(defuserID));
+            bz_setShotMetaData(detonationShotID, "shotType", "bombDefusal");
+            bz_setShotMetaData(detonationShotID, "showOwner", defuserID);
+            bz_setShotMetaData(detonationShotID, "mineOwner", owner);
 
             bz_freePlayerRecord(pr);
 
             return true;
         }
+
         // This sets the mine for detonation - the mine will trigger,
         // killing the victim and setting the killer as the mine
         // owner.
         bool detonate()
         {
-            if (queuedRemoval)
+            if (detonated || defused || bz_getPlayerTeam(owner) == eObservers)
             {
                 return false;
             }
-
-            bz_BasePlayerRecord *pr = bz_getPlayerByIndex(owner);
-
-            if (!pr || pr->team == eObservers)
-            {
-                bz_freePlayerRecord(pr);
-                return false;
-            }
-
-            float minePos[3] = {x, y, z};
 
             detonated = true;
-            detonationTime = bz_getCurrentTime();
+
+            float minePos[3] = {x, y, z};
+            float vector[3] = {0, 0, 0};
 
             bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Mine UID %s detonated", uid.c_str());
 
-            queuedRemoval = bz_fireWorldWep("SW", 2.0, BZ_SERVER, minePos, 0, 0, 0, &detonationID, 0, team);
-
-            bz_freePlayerRecord(pr);
+            // Fire the world weapon
+            detonationShotID = bz_fireServerShot("SW", minePos, vector, team);
+            bz_setShotMetaData(detonationShotID, "shotType", "uselessMine");
+            bz_setShotMetaData(detonationShotID, "shotOwner", owner);
+            bz_setShotMetaData(detonationShotID, "mineOwner", owner);
 
             return true;
         }
@@ -179,6 +171,8 @@ private:
          reloadDefusalMessages (),
          removePlayerMines (int playerID),
          removeMine (Mine &mine),
+         sendDefuseMessage (int defuserID, int mineOwnerID, int victimID),
+         sendDeathMessage (int mineOwner, int victimID),
          setMine (int owner, float pos[3], bz_eTeamType team);
     std::string formatMineMessage (std::string msg, std::string mineOwner, std::string defuserOrVictim);
 
@@ -220,7 +214,12 @@ void UselessMine::Init (const char* commandLine)
 
     bz_RegisterCustomFlag("BD", "Bomb Defusal", "Safely defuse enemy mines while killing the mine owners", 0, eGoodFlag);
 
-    bztk_registerCustomDoubleBZDB("_mineSafetyTime", 5.0);
+    if (!bz_BZDBItemExists("_mineSafetyTime"))
+    {
+        bz_setBZDBDouble("_mineSafetyTime", 5.0);
+    }
+
+    bz_setDefaultBZDBDouble("_mineSafetyTime", 5.0);
 
     // Save the location of the file so we can reload after
 
@@ -294,101 +293,30 @@ void UselessMine::Event (bz_EventData *eventData)
             bz_PlayerDieEventData_V1* dieData = (bz_PlayerDieEventData_V1*)eventData;
 
             int victimID = dieData->playerID;
+            uint32_t shotGUID = bz_getShotGUID(dieData->killerID, dieData->shotID);
 
-            for (Mine &mine : activeMines)
+            // Only handle shots that have this plugin's metadata
+            if (bz_shotHasMetaData(shotGUID, "shotType"))
             {
-                // We delete the mine after it's considered stale. This way, we can correctly allow for multiple players to be killed by the mine
-                if (mine.isStale())
+                bz_ApiString shotType = bz_getShotMetaDataS(shotGUID, "shotType");
+
+                // Reassign the killer ID to the mine owner or the bomb defuser
+                if (shotType == "uselessMine" || shotType == "bombDefusal")
                 {
-                    removeMine(mine);
-                    continue;
-                }
+                    int shotOwnerID = bz_getShotMetaDataI(shotGUID, "shotOwner");
+                    int mineOwnerID = bz_getShotMetaDataI(shotGUID, "mineOwner");
 
-                // This isn't the mine we're looking for since it hasn't been touched
-                if (!mine.detonated && !mine.defused)
-                {
-                    continue;
-                }
+                    dieData->killerID = shotOwnerID;
 
-                // If the shot IDs don't match, this mine wasn't the killer
-                if (dieData->shotID != mine.detonationID)
-                {
-                    continue;
-                }
-
-
-                // This is the mine that killed our player, so handle it
-
-                const char* mineOwner = bz_getPlayerCallsign(mine.owner);
-                const char* explosionVictim = bz_getPlayerCallsign(victimID);
-
-                if (mine.detonated)
-                {
-                    dieData->killerID = mine.owner;
-
-                    if (victimID != mine.owner)
+                    if (shotType == "uselessMine")
                     {
-                        if (!deathMessages.empty())
-                        {
-                            // The random number used to fetch a random taunting death message
-                            int randomNumber = rand() % deathMessages.size();
-                            std::string deathMessage = deathMessages.at(randomNumber);
-
-                            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, mineOwner, explosionVictim).c_str());
-                        }
-                        else
-                        {
-                            // If there are no death messages, explain to the user that it was a mine that killed them
-                            bz_sendTextMessagef(BZ_SERVER, victimID, "You were killed by %s's mine", mineOwner);
-                        }
+                        sendDeathMessage(mineOwnerID, victimID);
                     }
-                    else
+                    else if (shotType == "bombDefusal")
                     {
-                        // If the owner was killed with their own mine, send a message
-                        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was owned by their own mine!", mineOwner);
+                        sendDefuseMessage(shotOwnerID, mineOwnerID, victimID);
                     }
                 }
-                else if (mine.defused)
-                {
-                    // Make sure the killer was the server, and the victim was the owner.
-                    if (dieData->killerID == 253)
-                    {
-                        // Since the killer was the server, it was the defusal that killed the player. Thus,
-                        // give credit where credit is due.
-                        dieData->killerID = mine.defuserID;
-
-                        // Take note of the defuser's callsign
-                        const char* mineDefuser = bz_getPlayerCallsign(mine.defuserID);
-
-                        if (victimID == mine.owner)
-                        {
-                            if (!defusalMessages.empty())
-                            {
-                                // The random number used to fetch a random taunting defusal message
-                                int randomNumber = rand() % defusalMessages.size();
-
-                                // Get a random defusal message
-                                std::string defusalMessage = defusalMessages.at(randomNumber);
-                                bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, mineOwner, mineDefuser).c_str());
-                            }
-                            else
-                            {
-                                // Let the BD player know that they killed the owner
-                                bz_sendTextMessagef(BZ_SERVER, mine.defuserID, "You defused %s's mine", mineOwner);
-
-                                // Let the owner know that they were killed by the BD player
-                                bz_sendTextMessagef(BZ_SERVER, mine.owner, "You were killed by %s's mine defusal", mineDefuser);
-                            }
-                        }
-                        else
-                        {
-                            // If the victim wasn't the owner, then send a different message
-                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was killed by %s's mine defusal.", explosionVictim, mineDefuser);
-                        }
-                    }
-                }
-
-                break;
             }
         }
         break;
@@ -440,6 +368,7 @@ void UselessMine::Event (bz_EventData *eventData)
                     // mine so move on to check the next mine
                     if (mineWentBoom)
                     {
+                        removeMine(mine);
                         break;
                     }
                 }
@@ -499,7 +428,7 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
 
         for (Mine &mine : activeMines)
         {
-            if (mine.queuedRemoval)
+            if (mine.isStale())
             {
                 continue;
             }
@@ -559,6 +488,68 @@ std::string UselessMine::formatMineMessage(std::string msg, std::string mineOwne
     return formattedMessage;
 }
 
+void UselessMine::sendDefuseMessage(int defuserID, int mineOwnerID, int victimID)
+{
+    const char* defuserCallsign = bz_getPlayerCallsign(defuserID);
+    const char* mineOwnerCallsign = bz_getPlayerCallsign(mineOwnerID);
+    const char* victimCallsign = bz_getPlayerCallsign(victimID);
+
+    if (victimID == mineOwnerID)
+    {
+        if (defusalMessages.empty())
+        {
+            // Let the BD player know that they killed the owner
+            bz_sendTextMessagef(BZ_SERVER, defuserID, "You defused %s's mine", mineOwnerCallsign);
+
+            // Let the owner know that they were killed by the BD player
+            bz_sendTextMessagef(BZ_SERVER, mineOwnerID, "You were killed by %s's mine defusal", defuserCallsign);
+        }
+        else
+        {
+            // The random number used to fetch a random taunting defusal message
+            int randomNumber = rand() % defusalMessages.size();
+
+            // Get a random defusal message
+            std::string defusalMessage = defusalMessages.at(randomNumber);
+            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, mineOwnerCallsign, defuserCallsign).c_str());
+        }
+    }
+    else
+    {
+        // If the victim wasn't the owner, then send a different message
+        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was killed by %s's mine defusal.", victimCallsign, defuserCallsign);
+    }
+}
+
+void UselessMine::sendDeathMessage(int mineOwner, int victimID)
+{
+    const char* mineOwnerCallsign = bz_getPlayerCallsign(mineOwner);
+
+    if (victimID == mineOwner)
+    {
+        // If the owner was killed with their own mine, send a message
+        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s was owned by their own mine!", mineOwnerCallsign);
+
+        return;
+    }
+
+    if (deathMessages.empty())
+    {
+        // If there are no death messages, explain to the user that it was a mine that killed them
+        bz_sendTextMessagef(BZ_SERVER, victimID, "You were killed by %s's mine", mineOwnerCallsign);
+    }
+    else
+    {
+        // The random number used to fetch a random taunting death message
+        int randomNumber = rand() % deathMessages.size();
+        std::string deathMessage = deathMessages.at(randomNumber);
+
+        const char* mineVictimCallsign = bz_getPlayerCallsign(victimID);
+
+        bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, mineOwnerCallsign, mineVictimCallsign).c_str());
+    }
+}
+
 // Reload the death messages
 void UselessMine::reloadDeathMessages()
 {
@@ -566,7 +557,7 @@ void UselessMine::reloadDeathMessages()
 
     if (!deathMessagesFile.empty())
     {
-        bztk_fileToVector(deathMessagesFile.c_str(), deathMessages);
+        deathMessages = getFileTextLines(deathMessagesFile);
     }
 }
 
@@ -577,7 +568,7 @@ void UselessMine::reloadDefusalMessages()
 
     if (!defusalMessagesFile.empty())
     {
-        bztk_fileToVector(defusalMessagesFile.c_str(), defusalMessages);
+        defusalMessages = getFileTextLines(defusalMessagesFile);
     }
 }
 
@@ -588,7 +579,7 @@ int UselessMine::getMineCount()
 
     for (Mine &m : activeMines)
     {
-        if (!m.queuedRemoval)
+        if (!m.isStale())
         {
             count++;
         }
