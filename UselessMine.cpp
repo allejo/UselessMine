@@ -482,7 +482,7 @@ std::string UselessMine::formatMineMessage(std::string msg, std::string mineOwne
     bz_ApiString formattedMessage = msg;
     formattedMessage.replaceAll("%owner%", mineOwner.c_str());
     formattedMessage.replaceAll("%victim%", defuserOrVictim.c_str());
-    formattedMessage.replaceAll("%defuser", defuserOrVictim.c_str());
+    formattedMessage.replaceAll("%defuser%", defuserOrVictim.c_str());
     formattedMessage.replaceAll("%minecount%", std::to_string(getMineCount()).c_str());
 
     return formattedMessage;
