@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <memory>
 #include <stdlib.h>
 
@@ -74,7 +75,7 @@ public:
             defused(false),
             detonated(false)
         {
-            uid.format("%d_%d_%d", owner, bz_getCurrentTime(), bzfrand());
+            uid.format("%d_%d_%d", owner, bz_getCurrentTime(), rand() % 32);
         }
 
         bool isStale()
