@@ -184,6 +184,8 @@ private:
     std::string deathMessagesFile; // The path to the file containing death messages
     std::string defusalMessagesFile; // The path to the file containing defusal messages
     double playerSpawnTime[256]; // The time a player spawned last; used for _mineSafetyTime calculations
+
+    const char* bzdb_safetyTime = "_mineSafetyTime";
 };
 
 BZ_PLUGIN(UselessMine)
@@ -215,12 +217,7 @@ void UselessMine::Init (const char* commandLine)
 
     bz_RegisterCustomFlag("BD", "Bomb Defusal", "Safely defuse enemy mines while killing the mine owners", 0, eGoodFlag);
 
-    if (!bz_BZDBItemExists("_mineSafetyTime"))
-    {
-        bz_setBZDBInt("_mineSafetyTime", 5);
-    }
-
-    bz_setDefaultBZDBInt("_mineSafetyTime", 5);
+    bz_registerCustomBZDBInt(bzdb_safetyTime, 5);
 
     // Save the location of the file so we can reload after
 
@@ -271,6 +268,8 @@ void UselessMine::Cleanup (void)
     bz_removeCustomSlashCommand("minecount");
     bz_removeCustomSlashCommand("minestats");
     bz_removeCustomSlashCommand("reload");
+
+    bz_removeCustomBZDBVariable(bzdb_safetyTime);
 }
 
 void UselessMine::Event (bz_EventData *eventData)
@@ -350,7 +349,7 @@ void UselessMine::Event (bz_EventData *eventData)
             bz_PlayerUpdateEventData_V1* updateData = (bz_PlayerUpdateEventData_V1*)eventData;
 
             int playerID = updateData->playerID;
-            bool bypassSafetyTime = (playerSpawnTime[playerID] + bz_getBZDBInt("_mineSafetyTime") <= bz_getCurrentTime());
+            bool bypassSafetyTime = (playerSpawnTime[playerID] + bz_getBZDBInt(bzdb_safetyTime) <= bz_getCurrentTime());
             bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
 
             bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: player #%d at {%0.2f, %0.2f, %0.2f}",
