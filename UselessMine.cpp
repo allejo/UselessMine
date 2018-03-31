@@ -23,8 +23,6 @@
 #include <algorithm>
 #include <functional>
 #include <map>
-#include <memory>
-#include <stdlib.h>
 
 #include "bzfsAPI.h"
 #include "plugin_files.h"
@@ -44,11 +42,11 @@ const int BUILD = 84;
 class UselessMine : public bz_Plugin, public bz_CustomSlashCommandHandler
 {
 public:
-    virtual const char* Name ();
-    virtual void Init (const char* config);
-    virtual void Event (bz_EventData *eventData);
-    virtual void Cleanup (void);
-    virtual bool SlashCommand (int, bz_ApiString, bz_ApiString, bz_APIStringList*);
+    virtual const char* Name();
+    virtual void Init(const char* config);
+    virtual void Event(bz_EventData *eventData);
+    virtual void Cleanup(void);
+    virtual bool SlashCommand(int, bz_ApiString, bz_ApiString, bz_APIStringList*);
 
     typedef std::multimap< int, std::string, std::greater<int> > rmap;
 
@@ -65,7 +63,7 @@ public:
         bool defused;          // True if the mine was defused with a Bomb Defusal flag
         bool detonated;        // True if the mine was detonated by a player
 
-        Mine (int _owner, float _pos[3], bz_eTeamType _team) :
+        Mine(int _owner, float _pos[3], bz_eTeamType _team) :
             owner(_owner),
             defuserID(-1),
             x(_pos[0]),
@@ -167,17 +165,19 @@ public:
     };
 
 private:
-    int  getMineCount ();
-    void loadConfiguration(const char* commandline),
-         reloadDeathMessages (),
-         reloadDefusalMessages (),
-         removePlayerMines (int playerID),
-         removeMine (Mine &mine),
-         sendDefuseMessage (int defuserID, int mineOwnerID, int victimID),
-         sendDeathMessage (int mineOwner, int victimID),
-         setMine (int owner, float pos[3], bz_eTeamType team);
-    std::string formatMineMessage (std::string msg, std::string mineOwner, std::string defuserOrVictim),
-                parsePath(bz_ApiString path);
+    int getMineCount();
+
+    void loadConfiguration(const char* commandline);
+    void reloadDeathMessages();
+    void reloadDefusalMessages();
+    void removePlayerMines(int playerID);
+    void removeMine(Mine &mine);
+    void sendDefuseMessage(int defuserID, int mineOwnerID, int victimID);
+    void sendDeathMessage(int mineOwner, int victimID);
+    void setMine(int owner, float pos[3], bz_eTeamType team);
+
+    const char* formatMineMessage(std::string msg, std::string mineOwner, std::string defuserOrVictim);
+    const char* parsePath(bz_ApiString path);
 
     std::vector<std::string> deathMessages; // A vector that will store all of the witty death messages
     std::vector<std::string> defusalMessages; // A vector that will store all of the witty defusal messages
@@ -192,7 +192,7 @@ private:
 
 BZ_PLUGIN(UselessMine)
 
-const char* UselessMine::Name (void)
+const char* UselessMine::Name(void)
 {
     static std::string pluginName;
 
@@ -204,7 +204,7 @@ const char* UselessMine::Name (void)
     return pluginName.c_str();
 }
 
-void UselessMine::Init (const char* commandLine)
+void UselessMine::Init(const char* commandLine)
 {
     Register(bz_eFlagGrabbedEvent);
     Register(bz_ePlayerDieEvent);
@@ -245,7 +245,7 @@ void UselessMine::Init (const char* commandLine)
     }
 }
 
-void UselessMine::Cleanup (void)
+void UselessMine::Cleanup(void)
 {
     Flush();
 
@@ -257,7 +257,7 @@ void UselessMine::Cleanup (void)
     bz_removeCustomBZDBVariable(bzdb_safetyTime);
 }
 
-void UselessMine::Event (bz_EventData *eventData)
+void UselessMine::Event(bz_EventData *eventData)
 {
     switch (eventData->eventType)
     {
@@ -462,7 +462,7 @@ bool UselessMine::SlashCommand(int playerID, bz_ApiString command, bz_ApiString 
 }
 
 // A function to format death messages in order to replace placeholders with callsigns and values
-std::string UselessMine::formatMineMessage(std::string msg, std::string mineOwner, std::string defuserOrVictim)
+const char* UselessMine::formatMineMessage(std::string msg, std::string mineOwner, std::string defuserOrVictim)
 {
     bz_ApiString formattedMessage = msg;
     formattedMessage.replaceAll("%owner%", mineOwner.c_str());
@@ -470,7 +470,7 @@ std::string UselessMine::formatMineMessage(std::string msg, std::string mineOwne
     formattedMessage.replaceAll("%defuser%", defuserOrVictim.c_str());
     formattedMessage.replaceAll("%minecount%", std::to_string(getMineCount()).c_str());
 
-    return formattedMessage;
+    return formattedMessage.c_str();
 }
 
 void UselessMine::sendDefuseMessage(int defuserID, int mineOwnerID, int victimID)
@@ -496,7 +496,7 @@ void UselessMine::sendDefuseMessage(int defuserID, int mineOwnerID, int victimID
 
             // Get a random defusal message
             std::string defusalMessage = defusalMessages.at(randomNumber);
-            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, mineOwnerCallsign, defuserCallsign).c_str());
+            bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(defusalMessage, mineOwnerCallsign, defuserCallsign));
         }
     }
     else
@@ -531,7 +531,7 @@ void UselessMine::sendDeathMessage(int mineOwner, int victimID)
 
         const char* mineVictimCallsign = bz_getPlayerCallsign(victimID);
 
-        bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, mineOwnerCallsign, mineVictimCallsign).c_str());
+        bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, mineOwnerCallsign, mineVictimCallsign));
     }
 }
 
@@ -555,7 +555,7 @@ void UselessMine::loadConfiguration(const char *commandline)
     }
 }
 
-std::string UselessMine::parsePath(bz_ApiString path)
+const char* UselessMine::parsePath(bz_ApiString path)
 {
     std::string lower = bz_tolower(path.c_str());
 
@@ -564,7 +564,7 @@ std::string UselessMine::parsePath(bz_ApiString path)
         return "";
     }
 
-    return path;
+    return path.c_str();
 }
 
 // Reload the death messages
