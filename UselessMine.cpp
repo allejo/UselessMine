@@ -168,14 +168,16 @@ public:
 
 private:
     int  getMineCount ();
-    void reloadDeathMessages (),
+    void loadConfiguration(const char* commandline),
+         reloadDeathMessages (),
          reloadDefusalMessages (),
          removePlayerMines (int playerID),
          removeMine (Mine &mine),
          sendDefuseMessage (int defuserID, int mineOwnerID, int victimID),
          sendDeathMessage (int mineOwner, int victimID),
          setMine (int owner, float pos[3], bz_eTeamType team);
-    std::string formatMineMessage (std::string msg, std::string mineOwner, std::string defuserOrVictim);
+    std::string formatMineMessage (std::string msg, std::string mineOwner, std::string defuserOrVictim),
+                parsePath(bz_ApiString path);
 
     std::vector<std::string> deathMessages; // A vector that will store all of the witty death messages
     std::vector<std::string> defusalMessages; // A vector that will store all of the witty defusal messages
@@ -219,24 +221,7 @@ void UselessMine::Init (const char* commandLine)
 
     bz_registerCustomBZDBInt(bzdb_safetyTime, 5);
 
-    // Save the location of the file so we can reload after
-
-    // This expects two command line parameters: the death messages
-    // file and the defusal messages file.
-    bz_APIStringList cmdLineParams;
-    cmdLineParams.tokenize(commandLine, ",");
-
-    if (cmdLineParams.size() == 2)
-    {
-        deathMessagesFile = cmdLineParams.get(0);
-        defusalMessagesFile = cmdLineParams.get(1);
-    }
-    else
-    {
-        deathMessagesFile = "";
-        defusalMessagesFile = "";
-        bz_debugMessagef(DEBUG_VERBOSITY, "WARNING :: Useless Mine :: No messages loaded");
-    }
+    loadConfiguration(commandLine);
 
     reloadDeathMessages();
     reloadDefusalMessages();
@@ -548,6 +533,38 @@ void UselessMine::sendDeathMessage(int mineOwner, int victimID)
 
         bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, mineOwnerCallsign, mineVictimCallsign).c_str());
     }
+}
+
+void UselessMine::loadConfiguration(const char *commandline)
+{
+    deathMessagesFile = "";
+    defusalMessagesFile = "";
+
+    // This expects two command line parameters: the death messages file and the defusal messages file.
+    bz_APIStringList cmdLineParams;
+    cmdLineParams.tokenize(commandline, ",");
+
+    if (cmdLineParams.size() >= 1)
+    {
+        deathMessagesFile = parsePath(cmdLineParams.get(0));
+    }
+
+    if (cmdLineParams.size() >= 2)
+    {
+        defusalMessagesFile = parsePath(cmdLineParams.get(1));
+    }
+}
+
+std::string UselessMine::parsePath(bz_ApiString path)
+{
+    std::string lower = bz_tolower(path.c_str());
+
+    if (lower == "null")
+    {
+        return "";
+    }
+
+    return path;
 }
 
 // Reload the death messages
