@@ -36,7 +36,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 2;
 const int REV = 0;
-const int BUILD = 84;
+const int BUILD = 97;
 
 enum class ExplosionType
 {

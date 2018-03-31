@@ -1,3 +1,17 @@
+## 1.2.0
+
+**Changes**
+
+- Minimum of bzfs 2.4.14 is required
+- Dropped bztoolkit dependency
+- No longer require `-setforced` to set the custom BZDB variables
+- The `.defuseMessages` file is now optional at when the plug-in is loaded
+- The special keyword `NULL` can be passed instead of a file path for either the death or defusal messages
+
+**Fixes**
+
+- Makes use of new world weapon API, which allows for better point assignment for both mines and defusals
+
 ## 1.1.0
 
 **New**

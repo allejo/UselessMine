@@ -35,15 +35,19 @@ Order matters when you're loading the plug-in, it must be death messages before 
 
 ### Custom BZDB Variables
 
-These custom BZDB variables must be used with `-setforced`, which sets BZDB variable `<name>` to `<value>`, even if the variable does not exist. These variables may be changed at any time in-game by using the `/set` command.
+These custom BZDB variables can be configured with `-set` in configuration files and may be changed at any time in-game by using the `/set` command.
 
 ```
--setforced <name> <value>
+-set <name> <value>
 ```
 
 | Name              | Type | Default | Description                              |
 | ----------------- | :--: | :-----: | ---------------------------------------- |
 | `_mineSafetyTime` | int  |    5    | The number of seconds a player has to leave the mine detonation radius if they accidentally spawn in it. |
+
+> **Note**
+>
+> Beginning with version **1.2.0** of the plug-in, the use of `-setforced` is no longer required; in fact, it's now discouraged.
 
 ### Custom Slash Commands
 
