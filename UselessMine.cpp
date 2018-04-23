@@ -36,7 +36,7 @@ const std::string PLUGIN_NAME = "Useless Mine";
 const int MAJOR = 1;
 const int MINOR = 2;
 const int REV = 0;
-const int BUILD = 97;
+const int BUILD = 98;
 
 enum class ExplosionType
 {
@@ -135,8 +135,9 @@ public:
             defuserID = playerID;
 
             float vector[3] = {0, 0, 0};
+            int explosionType = (int)ExplosionType::Defusal;
             detonationShotID = bz_fireServerShot("SW", pr->lastKnownState.pos, vector, bz_getPlayerTeam(defuserID));
-            bz_setShotMetaData(detonationShotID, ww_shotType, (int)ExplosionType::Defusal);
+            bz_setShotMetaData(detonationShotID, ww_shotType, explosionType);
             bz_setShotMetaData(detonationShotID, ww_shotOwner, defuserID);
             bz_setShotMetaData(detonationShotID, ww_mineOwner, owner);
 
@@ -163,8 +164,9 @@ public:
             bz_debugMessagef(DEBUG_VERBOSITY, "DEBUG :: Useless Mine :: Mine UID %s detonated", uid.c_str());
 
             // Fire the world weapon
+            int explosionType = (int)ExplosionType::Mine;
             detonationShotID = bz_fireServerShot("SW", minePos, vector, team);
-            bz_setShotMetaData(detonationShotID, ww_shotType, (int)ExplosionType::Mine);
+            bz_setShotMetaData(detonationShotID, ww_shotType, explosionType);
             bz_setShotMetaData(detonationShotID, ww_shotOwner, owner);
             bz_setShotMetaData(detonationShotID, ww_mineOwner, owner);
 
