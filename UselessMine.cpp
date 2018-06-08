@@ -35,8 +35,8 @@ const std::string PLUGIN_NAME = "Useless Mine";
 // Define plugin version numbering
 const int MAJOR = 1;
 const int MINOR = 2;
-const int REV = 0;
-const int BUILD = 98;
+const int REV = 1;
+const int BUILD = 99;
 
 enum class ExplosionType
 {
@@ -493,6 +493,11 @@ void UselessMine::sendDefuseMessage(int defuserID, int mineOwnerID, int victimID
     const char* mineOwnerCallsign = bz_getPlayerCallsign(mineOwnerID);
     const char* victimCallsign = bz_getPlayerCallsign(victimID);
 
+    if (!defuserCallsign || !mineOwnerCallsign || !victimCallsign)
+    {
+        return;
+    }
+
     if (victimID == mineOwnerID)
     {
         if (defusalMessages.empty())
@@ -524,6 +529,11 @@ void UselessMine::sendDeathMessage(int mineOwner, int victimID)
 {
     const char* mineOwnerCallsign = bz_getPlayerCallsign(mineOwner);
 
+    if (!mineOwnerCallsign)
+    {
+        return;
+    }
+
     if (victimID == mineOwner)
     {
         // If the owner was killed with their own mine, send a message
@@ -544,6 +554,11 @@ void UselessMine::sendDeathMessage(int mineOwner, int victimID)
         std::string deathMessage = deathMessages.at(randomNumber);
 
         const char* mineVictimCallsign = bz_getPlayerCallsign(victimID);
+
+        if (!mineVictimCallsign)
+        {
+            return;
+        }
 
         bz_sendTextMessage(BZ_SERVER, BZ_ALLUSERS, formatMineMessage(deathMessage, mineOwnerCallsign, mineVictimCallsign).c_str());
     }
